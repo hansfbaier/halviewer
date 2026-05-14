@@ -79,7 +79,6 @@ class NodeEdge(QGraphicsPathItem):
         self._target_node = des_node
         self._target_port = des_port
         self.color = Qt.GlobalColor.gray
-        # self.style = Qt.SolidLine
         self.style = Qt.PenStyle.SolidLine
         self._pen_default = QPen(self.color)
         self._pen_default.setWidthF(2)
@@ -97,7 +96,6 @@ class NodeEdge(QGraphicsPathItem):
             self._pen_default.setWidthF(self.width)
         painter.setPen(self._pen_default)
         self.update_edge_path()
-        # painter.setBrush(Qt.NoBrush)
         painter.drawPath(self.path())
 
     def update_edge_path(self):
@@ -186,13 +184,14 @@ class MyNode(QGraphicsItem):
         self.height = len(self.pins) * 16 + self.radius * 2
         return QRectF(0, 0, self.width, self.height)
 
-    def paintPort(self, painter, x, y):
+    def paintPort(self, painter, x, y, direction):
         painter.fillRect(QRectF(x - 5, y - 5, 10, 10), Qt.GlobalColor.yellow)
-        painter.fillRect(QRectF(x - 4, y - 4, 8, 8), Qt.GlobalColor.black)
+        if direction == "1":
+            painter.fillRect(QRectF(x - 4, y - 4, 8, 8), Qt.GlobalColor.black)
+        else:
+            painter.fillRect(QRectF(x - 4, y - 4, 8, 8), Qt.GlobalColor.gray)
 
     def paint(self, painter, option, widget):
-        # painter.setRenderHint(QPainter.Antialiasing)
-
         if self.hover:
             pen = QPen(self.border_color_hover, self.border_size)
         elif self.isSelected():
@@ -215,24 +214,71 @@ class MyNode(QGraphicsItem):
         painter.setPen(QPen(self.title_color, 1))
         painter.setFont(QFont(self.text_font, self.title_size))
         py = self.radius
-        for pin_name, pin_title in self.pins.items():
-            # painter.fillRect(QRectF(0, py, self.width, 16), Qt.GlobalColor.black)
-            # painter.drawRect(QRectF(0, py, self.width, 16))
-            if py != self.radius and pin_title[0] != "-":
-                painter.setPen(QPen(self.info_color, 1))
-                self.paintPort(painter, 8, py + 8)
-                self.paintPort(painter, self.width - 8, py + 8)
-                painter.drawText(
-                    QRectF(0, py, self.width, 16),
-                    Qt.AlignmentFlag.AlignCenter,
-                    pin_title,
-                )
-            else:
+        for pin_name, pin_data in self.pins.items():
+            pin_title = pin_data["pin"]
+            direction = pin_data["dir"]
+            is_setp = pin_data["is_setp"]
+            vtype = pin_data["type"]
+            value = pin_data["value"]
+            if vtype == "2":
                 painter.setPen(QPen(self.title_color, 1))
                 painter.drawText(
                     QRectF(0, py - 2, self.width, 16),
                     Qt.AlignmentFlag.AlignCenter,
-                    pin_title,
+                    f"{pin_title}",
+                )
+            elif is_setp == "1":
+                painter.setPen(QPen(self.info_color, 1))
+                painter.drawText(
+                    QRectF(0, py, self.width, 16),
+                    Qt.AlignmentFlag.AlignCenter,
+                    f"{pin_title}={value}",
+                )
+            else:
+                painter.setPen(QPen(self.title_color, 1))
+                self.paintPort(painter, 8, py + 8, direction)
+                self.paintPort(painter, self.width - 8, py + 8, direction)
+                if direction == "1":
+                    painter.drawLine(QPointF(15, py + 8), QPointF(15 + 5, py + 8))
+                    painter.drawLine(
+                        QPointF(15 + 2, py + 8 - 2), QPointF(15 + 5, py + 8)
+                    )
+                    painter.drawLine(
+                        QPointF(15 + 2, py + 8 + 2), QPointF(15 + 5, py + 8)
+                    )
+                    painter.drawLine(
+                        QPointF(self.width - 15, py + 8),
+                        QPointF(self.width - 15 - 5, py + 8),
+                    )
+                    painter.drawLine(
+                        QPointF(self.width - 15 - 2, py + 8 - 2),
+                        QPointF(self.width - 15 - 5, py + 8),
+                    )
+                    painter.drawLine(
+                        QPointF(self.width - 15 - 2, py + 8 + 2),
+                        QPointF(self.width - 15 - 5, py + 8),
+                    )
+                else:
+                    painter.drawLine(QPointF(15, py + 8), QPointF(15 + 5, py + 8))
+                    painter.drawLine(QPointF(15, py + 8), QPointF(15 + 3, py + 8 - 2))
+                    painter.drawLine(QPointF(15, py + 8), QPointF(15 + 3, py + 8 + 2))
+                    painter.drawLine(
+                        QPointF(self.width - 15, py + 8),
+                        QPointF(self.width - 15 - 5, py + 8),
+                    )
+                    painter.drawLine(
+                        QPointF(self.width - 15, py + 8),
+                        QPointF(self.width - 15 - 3, py + 8 - 2),
+                    )
+                    painter.drawLine(
+                        QPointF(self.width - 15, py + 8),
+                        QPointF(self.width - 15 - 3, py + 8 + 2),
+                    )
+
+                painter.drawText(
+                    QRectF(0, py, self.width, 16),
+                    Qt.AlignmentFlag.AlignCenter,
+                    f"{pin_title}={value}",
                 )
             py += 16
 
@@ -330,7 +376,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("HalView")
         self.resize(1200, 900)
 
-        self.scene = NodeScene(-5000, -5000, 12000, 12000, self)
+        self.scene = NodeScene(-7000, -7000, 12000, 12000, self)
         self.view = NodeViewer(self.scene)
         self.view.setZoom(1.0)
 
@@ -339,7 +385,7 @@ class MainWindow(QMainWindow):
         if self.root is None:
             print("ERROR parsing ini file")
             exit(0)
-        # open("/tmp/g.svg", "w").write(svg_data.decode())
+        open("/tmp/g.svg", "w").write(svg_data.decode())
 
         self.h = hal.component(f"halview-{uuid.uuid4()}")
 
@@ -414,15 +460,62 @@ class MainWindow(QMainWindow):
                         "spindle.",
                         "iocontrol.",
                         "axis.",
+                        "motion.digital-in-",
+                        "motion.digital-out-",
+                        "motion.feed-",
+                        "motion.tooloffset.",
+                        "motion.analog-in-",
+                        "motion.analog-out-",
+                        "motion-command-handler.time",
+                        "motion-controller.time",
+                        "motion.adaptive-feed",
+                        "motion.coord-error",
+                        "motion.coord-mode",
+                        "motion.current-vel",
+                        "motion.distance-to-go",
+                        "motion.eoffset-active",
+                        "motion.eoffset-limited",
+                        "motion.homing-inhibit",
+                        "motion.in-position",
+                        "motion.jog-inhibit",
+                        "motion.jog-is-active",
+                        "motion.jog-stop",
+                        "motion.jog-stop-immediate",
+                        "motion.on-soft-limit",
+                        "motion.requested-vel",
+                        "motion.servo.last-period",
+                        "motion.tp-reverse",
                     )
-                    pfilter = "-not"
+                    pfilter = (
+                        "-not",
+                        ".maxcmdD",
+                        ".maxcmdDD",
+                        ".maxcmdDDD",
+                        ".maxerror",
+                        ".maxerrorD",
+                        ".maxerrorI",
+                        ".maxoutput",
+                        ".saturated",
+                        ".saturated-count",
+                        ".saturated-s",
+                        ".tune-cycles",
+                        ".tune-effort",
+                        ".tune-mode",
+                        ".tune-start",
+                        ".tune-type",
+                        ".command-deriv",
+                        ".do-pid-calcs.time",
+                        ".error-previous-target",
+                        ".feedback-deriv",
+                    )
                     if not name.startswith((cfilter)) and not name.endswith(pfilter):
+                        print(name)
                         self.setps[name] = value
 
         groups = {}
         for signal_name, parts in self.signals.items():
             source_parts = parts["source"].split(".")
-            source_value = parts.get("source_value", "")
+            source_value = parts.get("source_value")
             source_group = ".".join(source_parts[:-1])
             source_pin = source_parts[-1]
             if (
@@ -444,10 +537,9 @@ class MainWindow(QMainWindow):
             if source_group:
                 if source_group not in groups:
                     groups[source_group] = []
-                if source_value:
-                    groups[source_group].append(f"{source_pin}={source_value}")
-                else:
-                    groups[source_group].append(source_pin)
+                groups[source_group].append(
+                    {"pin": source_pin, "value": source_value, "dir": "out"}
+                )
 
             for target in parts["targets"]:
                 target_parts = target.split(".")
@@ -467,7 +559,7 @@ class MainWindow(QMainWindow):
 
                 if target_group not in groups:
                     groups[target_group] = []
-                groups[target_group].append(target_pin)
+                groups[target_group].append({"pin": target_pin, "dir": "in"})
 
                 if not source_group and not source_pin:
                     continue
@@ -476,60 +568,38 @@ class MainWindow(QMainWindow):
 
                 source_name = source.split("=")[0]
                 eid = source_name.replace(":", ".")
-                if source.startswith("pyvcp"):
-                    self.gAll.edge(
-                        target_name,
-                        source_name,
-                        dir="back",
-                        id=eid,
-                        penwidth="2",
-                        color=colors["edge"],
-                    )
-                elif target.startswith("pyvcp"):
-                    self.gAll.edge(
-                        source_name,
-                        target_name,
-                        id=eid,
-                        penwidth="2",
-                        color=colors["edge"],
-                    )
-                elif source.startswith(("rio.", "lcec.0.rio.")):
-                    self.gAll.edge(
-                        target_name,
-                        source_name,
-                        dir="back",
-                        id=eid,
-                        penwidth="2",
-                        color=colors["edge"],
-                    )
-                else:
-                    self.gAll.edge(
-                        source_name,
-                        target_name,
-                        id=eid,
-                        penwidth="2",
-                        color=colors["edge"],
-                    )
+                self.gAll.edge(
+                    source_name,
+                    target_name,
+                    id=eid,
+                    penwidth="2",
+                    color=colors["edge"],
+                )
 
         used = []
         for group_name in sorted(groups, reverse=True):
-            pins = groups[group_name]
-            # cgroup = group_name.split(".")[0]
             pin_strs = []
-            for pin in sorted(pins):
-                port = pin.split("=")[0]
-                pin_str = f'<tr><td bgcolor="{colors["port_bg"]}" port="{port}"><font color="{colors["port_text"]}">{pin}=000.000</font></td></tr>'
+            for pin_data in groups[group_name]:
+                port = pin_data["pin"]
+                direction = pin_data["dir"]
+                value = pin_data.get("value")
+                text = f"{port}={value}"
+                ccode = "#000000"
+                if direction == "in":
+                    ccode = "#010000"
+                pin_str = f'<tr><td bgcolor="{colors["port_bg"]}" port="{port}"><font color="{ccode}">{text}=000.000</font></td></tr>'
                 pin_strs.append(pin_str)
 
             for setp_raw, value in self.setps.items():
                 if setp_raw.startswith(group_name) and setp_raw not in used:
                     used.append(setp_raw)
                     setp = setp_raw.replace(f"{group_name}.", "")
-                    pin_str = f'<tr><td bgcolor="{colors["setp_bg"]}" port="{setp}"><font color="{colors["setp_text"]}">-{setp}={value}=000.000-</font></td></tr>'
+                    ccode = "#000100"
+                    pin_str = f'<tr><td bgcolor="{colors["setp_bg"]}" port="{setp}"><font color="{ccode}">{setp}=000.000</font></td></tr>'
                     pin_strs.append(pin_str)
 
             title = group_name.replace("\\n", "<br/>")
-            label = f'<<table border="0" cellborder="1" cellspacing="0"><tr><td bgcolor="{colors["header_bg"]}"><font color="{colors["header_text"]}">{title}</font></td></tr>{"".join(pin_strs)}</table>>'
+            label = f'<<table border="0" cellborder="1" cellspacing="0"><tr><td bgcolor="{colors["header_bg"]}"><font color="#000002">{title}</font></td></tr>{"".join(pin_strs)}</table>>'
             self.gAll.node(
                 group_name,
                 shape="plaintext",
@@ -562,13 +632,24 @@ class MainWindow(QMainWindow):
 
                 pins = {}
                 for text in node.findall(".//{http://www.w3.org/2000/svg}text"):
+                    info = text.attrib["fill"]
+                    # color coded additional infos
+                    direction = info[2]
+                    is_setp = info[4]
+                    vtype = info[6]
+                    # print(direction, setp, vtype)
                     pin_name = text.text.split("=")[0]
-                    pins[pin_name] = text.text
+                    pdict = {
+                        "node": title.text,
+                        "pin": pin_name,
+                        "dir": direction,
+                        "is_setp": is_setp,
+                        "type": vtype,
+                        "value": None,
+                    }
+                    pins[pin_name] = pdict
                     if title.text != pin_name:
-                        self.pinsdict[f"{title.text}.{pin_name.strip('-')}"] = (
-                            title.text,
-                            pin_name,
-                        )
+                        self.pinsdict[f"{title.text}.{pin_name}"] = pdict
 
                 w = abs(x2 - x1) + 30
                 h = abs(y2 - y1)
@@ -617,14 +698,13 @@ class MainWindow(QMainWindow):
             elif pinType == 2:
                 pinValue = f"{pinValue:0.3f}"
             if pinName in self.pinsdict:
-                node_name, pin_name = self.pinsdict[pinName]
+                node_name = self.pinsdict[pinName]["node"]
+                pin_name = self.pinsdict[pinName]["pin"]
+                # direction = self.pinsdict[pinName]["dir"]
+                # is_setp = self.pinsdict[pinName]["is_setp"]
                 node = self.nodesdict[node_name]
-                text = f"{pin_name}={pinValue}"
-                if node.pins[pin_name] != text:
-                    if pin_name[0] == "-":
-                        node.pins[pin_name] = f"{pin_name}={pinValue}-"
-                    else:
-                        node.pins[pin_name] = f"{pin_name}={pinValue}"
+                if node.pins[pin_name]["value"] != pinValue:
+                    node.pins[pin_name]["value"] = pinValue
                     updates.add(node)
 
             if pinName in self.edges:
