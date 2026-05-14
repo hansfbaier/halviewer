@@ -1,3 +1,7 @@
+#!/usr/bin/env python3
+#
+#
+
 import subprocess
 import sys
 import uuid
@@ -6,19 +10,61 @@ import xml.etree.ElementTree as ET
 import graphviz
 import hal
 
-from PyQt5.QtCore import QPoint, QPointF, QRectF, QTimer, Qt
-from PyQt5.QtGui import QBrush, QColor, QFont, QMouseEvent, QPainter, QPainterPath, QPen
-from PyQt5.QtWidgets import (
-    QApplication,
-    QGraphicsItem,
-    QGraphicsPathItem,
-    QGraphicsScene,
-    QGraphicsView,
-    QMainWindow,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-)
+qtversion = "5"
+if len(sys.argv) == 2:
+    if sys.argv[1] not in {"-5", "-6"}:
+        print("")
+        print(f"USAGE: {sys.argv[0]} [-5|-6]")
+        print("    -5: pyqt5 (default)")
+        print("    -6: pyqt6")
+        print("")
+        exit(1)
+    qtversion = sys.argv[1][1]
+
+if qtversion == "5":
+    from PyQt5.QtCore import QPoint, QPointF, QRectF, QTimer, Qt
+    from PyQt5.QtGui import (
+        QBrush,
+        QColor,
+        QFont,
+        QMouseEvent,
+        QPainter,
+        QPainterPath,
+        QPen,
+    )
+    from PyQt5.QtWidgets import (
+        QApplication,
+        QGraphicsItem,
+        QGraphicsPathItem,
+        QGraphicsScene,
+        QGraphicsView,
+        QMainWindow,
+        QPushButton,
+        QVBoxLayout,
+        QWidget,
+    )
+else:
+    from PyQt6.QtCore import QPoint, QPointF, QRectF, QTimer, Qt
+    from PyQt6.QtGui import (
+        QBrush,
+        QColor,
+        QFont,
+        QMouseEvent,
+        QPainter,
+        QPainterPath,
+        QPen,
+    )
+    from PyQt6.QtWidgets import (
+        QApplication,
+        QGraphicsItem,
+        QGraphicsPathItem,
+        QGraphicsScene,
+        QGraphicsView,
+        QMainWindow,
+        QPushButton,
+        QVBoxLayout,
+        QWidget,
+    )
 
 
 class NodeEdge(QGraphicsPathItem):
@@ -33,11 +79,12 @@ class NodeEdge(QGraphicsPathItem):
         self._target_node = des_node
         self._target_port = des_port
         self.color = Qt.GlobalColor.gray
-        self.style = Qt.SolidLine
+        # self.style = Qt.SolidLine
+        self.style = Qt.PenStyle.SolidLine
         self._pen_default = QPen(self.color)
         self._pen_default.setWidthF(2)
         self.setZValue(5)
-        self.setFlags(QGraphicsItem.ItemIsSelectable)
+        self.setFlags(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
         self.setAcceptHoverEvents(True)
         self.update_edge_path()
         self.hover = False
@@ -50,7 +97,7 @@ class NodeEdge(QGraphicsPathItem):
             self._pen_default.setWidthF(self.width)
         painter.setPen(self._pen_default)
         self.update_edge_path()
-        painter.setBrush(Qt.NoBrush)
+        # painter.setBrush(Qt.NoBrush)
         painter.drawPath(self.path())
 
     def update_edge_path(self):
@@ -144,7 +191,7 @@ class MyNode(QGraphicsItem):
         painter.fillRect(QRectF(x - 4, y - 4, 8, 8), Qt.GlobalColor.black)
 
     def paint(self, painter, option, widget):
-        painter.setRenderHint(QPainter.Antialiasing)
+        # painter.setRenderHint(QPainter.Antialiasing)
 
         if self.hover:
             pen = QPen(self.border_color_hover, self.border_size)
@@ -175,10 +222,18 @@ class MyNode(QGraphicsItem):
                 painter.setPen(QPen(self.info_color, 1))
                 self.paintPort(painter, 8, py + 8)
                 self.paintPort(painter, self.width - 8, py + 8)
-                painter.drawText(QRectF(0, py, self.width, 16), Qt.AlignmentFlag.AlignCenter, pin_title)
+                painter.drawText(
+                    QRectF(0, py, self.width, 16),
+                    Qt.AlignmentFlag.AlignCenter,
+                    pin_title,
+                )
             else:
                 painter.setPen(QPen(self.title_color, 1))
-                painter.drawText(QRectF(0, py - 2, self.width, 16), Qt.AlignmentFlag.AlignCenter, pin_title)
+                painter.drawText(
+                    QRectF(0, py - 2, self.width, 16),
+                    Qt.AlignmentFlag.AlignCenter,
+                    pin_title,
+                )
             py += 16
 
         # border
@@ -194,7 +249,7 @@ class MyNode(QGraphicsItem):
         self.update()
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             QGraphicsItem.mousePressEvent(self, event)
 
     def mouseReleaseEvent(self, event):
@@ -252,15 +307,19 @@ class NodeViewer(QGraphicsView):
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         self.mouse_pos_last = event.pos()
-        if self.button_pressed in [Qt.LeftButton]:
+        if self.button_pressed in [Qt.MouseButton.LeftButton]:
             pass
 
-        elif self.button_pressed in [Qt.MiddleButton]:
+        elif self.button_pressed in [Qt.MouseButton.MiddleButton]:
             offset = self.mouse_pos - event.pos()
             self.mouse_pos = event.pos()
             dx, dy = offset.x(), offset.y()
-            self.horizontalScrollBar().setValue(int(self.horizontalScrollBar().value() + dx))
-            self.verticalScrollBar().setValue(int(self.verticalScrollBar().value() + dy))
+            self.horizontalScrollBar().setValue(
+                int(self.horizontalScrollBar().value() + dx)
+            )
+            self.verticalScrollBar().setValue(
+                int(self.verticalScrollBar().value() + dy)
+            )
 
         super().mouseMoveEvent(event)
 
@@ -348,7 +407,14 @@ class MainWindow(QMainWindow):
                         self.signals[signal]["source"] = name
                 else:
                     owner, vtype, direction, value, name = line.split()
-                    cfilter = ("halui.", "joint.", "pid.", "spindle.", "iocontrol.", "axis.")
+                    cfilter = (
+                        "halui.",
+                        "joint.",
+                        "pid.",
+                        "spindle.",
+                        "iocontrol.",
+                        "axis.",
+                    )
                     pfilter = "-not"
                     if not name.startswith((cfilter)) and not name.endswith(pfilter):
                         self.setps[name] = value
@@ -359,7 +425,11 @@ class MainWindow(QMainWindow):
             source_value = parts.get("source_value", "")
             source_group = ".".join(source_parts[:-1])
             source_pin = source_parts[-1]
-            if source_group.startswith("halui.") or "vcp." in source_group or "qtdragon" in source_group:
+            if (
+                source_group.startswith("halui.")
+                or "vcp." in source_group
+                or "qtdragon" in source_group
+            ):
                 source_group = ".".join(source_parts[0:1])
                 source_pin = ".".join(source_parts[1:])
 
@@ -383,7 +453,11 @@ class MainWindow(QMainWindow):
                 target_parts = target.split(".")
                 target_group = ".".join(target_parts[:-1])
                 target_pin = target_parts[-1]
-                if target_group.startswith("halui.") or "vcp." in target_group or "qtdragon" in target_group:
+                if (
+                    target_group.startswith("halui.")
+                    or "vcp." in target_group
+                    or "qtdragon" in target_group
+                ):
                     target_group = ".".join(target_parts[0:1])
                     target_pin = ".".join(target_parts[1:])
                 target_name = f"{target_group}:{target_pin}"
@@ -403,13 +477,39 @@ class MainWindow(QMainWindow):
                 source_name = source.split("=")[0]
                 eid = source_name.replace(":", ".")
                 if source.startswith("pyvcp"):
-                    self.gAll.edge(target_name, source_name, dir="back", id=eid, penwidth="2", color=colors["edge"])
+                    self.gAll.edge(
+                        target_name,
+                        source_name,
+                        dir="back",
+                        id=eid,
+                        penwidth="2",
+                        color=colors["edge"],
+                    )
                 elif target.startswith("pyvcp"):
-                    self.gAll.edge(source_name, target_name, id=eid, penwidth="2", color=colors["edge"])
+                    self.gAll.edge(
+                        source_name,
+                        target_name,
+                        id=eid,
+                        penwidth="2",
+                        color=colors["edge"],
+                    )
                 elif source.startswith(("rio.", "lcec.0.rio.")):
-                    self.gAll.edge(target_name, source_name, dir="back", id=eid, penwidth="2", color=colors["edge"])
+                    self.gAll.edge(
+                        target_name,
+                        source_name,
+                        dir="back",
+                        id=eid,
+                        penwidth="2",
+                        color=colors["edge"],
+                    )
                 else:
-                    self.gAll.edge(source_name, target_name, id=eid, penwidth="2", color=colors["edge"])
+                    self.gAll.edge(
+                        source_name,
+                        target_name,
+                        id=eid,
+                        penwidth="2",
+                        color=colors["edge"],
+                    )
 
         used = []
         for group_name in sorted(groups, reverse=True):
@@ -465,13 +565,18 @@ class MainWindow(QMainWindow):
                     pin_name = text.text.split("=")[0]
                     pins[pin_name] = text.text
                     if title.text != pin_name:
-                        self.pinsdict[f"{title.text}.{pin_name.strip('-')}"] = (title.text, pin_name)
+                        self.pinsdict[f"{title.text}.{pin_name.strip('-')}"] = (
+                            title.text,
+                            pin_name,
+                        )
 
                 w = abs(x2 - x1) + 30
                 h = abs(y2 - y1)
                 w = max(w, 70)
                 h = max(h, 40)
-                self.nodesdict[title.text] = MyNode(self.scene, x1, y1, w, h, title.text, pins)
+                self.nodesdict[title.text] = MyNode(
+                    self.scene, x1, y1, w, h, title.text, pins
+                )
                 self.scene.addItem(self.nodesdict[title.text])
 
         self.edges = {}
@@ -482,7 +587,13 @@ class MainWindow(QMainWindow):
                 begin, end = title.text.split("->")
                 begin_node, begin_pin = begin.split(":")
                 end_node, end_pin = end.split(":")
-                edge = NodeEdge(self.scene, self.nodesdict[begin_node], begin_pin, self.nodesdict[end_node], end_pin)
+                edge = NodeEdge(
+                    self.scene,
+                    self.nodesdict[begin_node],
+                    begin_pin,
+                    self.nodesdict[end_node],
+                    end_pin,
+                )
                 self.scene.addItem(edge)
                 pin = f"{begin_node}.{begin_pin}"
                 if pin not in self.edges:
