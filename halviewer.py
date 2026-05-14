@@ -385,7 +385,7 @@ class MainWindow(QMainWindow):
         if self.root is None:
             print("ERROR parsing ini file")
             exit(0)
-        open("/tmp/g.svg", "w").write(svg_data.decode())
+        # open("/tmp/g.svg", "w").write(svg_data.decode())
 
         self.h = hal.component(f"halview-{uuid.uuid4()}")
 
@@ -509,7 +509,7 @@ class MainWindow(QMainWindow):
                         ".feedback-deriv",
                     )
                     if not name.startswith((cfilter)) and not name.endswith(pfilter):
-                        print(name)
+                        # print(name)
                         self.setps[name] = value
 
         groups = {}
