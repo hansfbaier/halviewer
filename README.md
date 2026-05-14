@@ -6,12 +6,13 @@ reads the hal from running linuxcnc session and shows the signals in realtime
 
 ![screenshot](./halviewer.png)
 
-## install depends
+## quickstart
+install depends
 ```
 apt-get install python3-pyqt5 python3-graphviz
 ```
 
-## before running halviewer, you need to run linuxcnc, than:
+before running halviewer, you need to run linuxcnc, than:
 ```
 python3 halviewer.py
 ```
