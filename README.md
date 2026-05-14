@@ -2,6 +2,8 @@
 
 graphical halviewer for linuxcnc
 
+reads the hal from running linuxcnc session and shows the signals in realtime
+
 ![screenshot](./halviewer.png)
 
 ## install depends
