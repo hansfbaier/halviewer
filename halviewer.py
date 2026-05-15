@@ -34,6 +34,7 @@ if qtversion == "5":
     )
     from PyQt5.QtWidgets import (
         QApplication,
+        QScrollArea,
         QGraphicsItem,
         QGraphicsPathItem,
         QGraphicsScene,
@@ -58,6 +59,7 @@ else:
     )
     from PyQt6.QtWidgets import (
         QApplication,
+        QScrollArea,
         QGraphicsItem,
         QGraphicsPathItem,
         QGraphicsScene,
@@ -373,10 +375,11 @@ class PinGraph(QWidget):
     def __init__(self, data):
         super().__init__()
         self.data = data
-        self.width = 200
+        self.width = 220
         self.height = 200
         self.setFixedWidth(self.width)
-        # self.setFixedHeight(self.height)
+        self.setFixedHeight(self.height)
+        self.setMinimumSize(self.width, self.height)
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -385,7 +388,7 @@ class PinGraph(QWidget):
         painter.setPen(QPen(Qt.GlobalColor.black, 1))
 
         try:
-            gw = self.width
+            gw = self.width - 20
             gh = 70
             py = 10
             for pin, data in self.data.items():
@@ -420,6 +423,10 @@ class PinGraph(QWidget):
                             gx_last = gx
 
                 py += gh + 5
+
+            self.height = py + 10
+            self.setFixedHeight(self.height)
+
         except Exception:
             pass
 
@@ -459,10 +466,16 @@ class MainWindow(QMainWindow):
         vboxMain = QVBoxLayout()
         vboxMain.addLayout(hboxButtons)
 
+        linecharts = QScrollArea()
+        linecharts.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        linecharts.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        linecharts.setWidgetResizable(True)
+        linecharts.setWidget(self.graphs)
+
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.splitter.addWidget(self.view)
-        self.splitter.addWidget(self.graphs)
-        self.splitter.setSizes([9999, 0])
+        self.splitter.addWidget(linecharts)
+        self.splitter.setSizes([self.geometry().width() - self.graphs.width, 0])
         vboxMain.addWidget(self.splitter)
 
         self.main = QWidget()
@@ -483,6 +496,13 @@ class MainWindow(QMainWindow):
             self.pin_graphs.remove(pin)
         else:
             self.pin_graphs.append(pin)
+
+        if self.pin_graphs:
+            self.splitter.setSizes(
+                [self.geometry().width() - self.graphs.width, self.graphs.width]
+            )
+        else:
+            self.splitter.setSizes([self.geometry().width(), 0])
 
     def export(self):
         colors = {
@@ -788,7 +808,6 @@ class MainWindow(QMainWindow):
 
             try:
                 # pin graph
-                self.pin_graph_data[pinName]
                 if pinName in self.pin_graph_data:
                     self.pin_graph_data[pinName]["data"] = [
                         pinValue,
@@ -824,10 +843,7 @@ class MainWindow(QMainWindow):
             node.update()
 
         if self.pin_graph_data:
-            self.splitter.setSizes([9999, self.graphs.width])
             self.graphs.update()
-        else:
-            self.splitter.setSizes([9999, 0])
 
     def freeze(self):
         self.run = 1 - self.run
