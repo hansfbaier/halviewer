@@ -42,6 +42,7 @@ if qtversion == "5":
         QPushButton,
         QVBoxLayout,
         QWidget,
+        QSplitter,
     )
 else:
     from PyQt6.QtCore import QPoint, QPointF, QRectF, QTimer, Qt
@@ -64,6 +65,7 @@ else:
         QPushButton,
         QVBoxLayout,
         QWidget,
+        QSplitter,
     )
 
 
@@ -71,9 +73,9 @@ class NodeEdge(QGraphicsPathItem):
     width = 3
     width_selected = 6
 
-    def __init__(self, scene, source_node, source_port, des_node, des_port):
+    def __init__(self, parent, source_node, source_port, des_node, des_port):
         super().__init__(None)
-        self.scene = scene
+        self.parent = parent
         self._source_node = source_node
         self._source_port = source_port
         self._target_node = des_node
@@ -151,9 +153,9 @@ class MyNode(QGraphicsItem):
     port_bottom = 10
     port_diff = 15
 
-    def __init__(self, scene, x, y, w, h, title, pins):
+    def __init__(self, parent, x, y, w, h, title, pins):
         super().__init__()
-        self.scene = scene
+        self.parent = parent
         self.width = w
         self.height = h
         self.title = title
@@ -164,6 +166,13 @@ class MyNode(QGraphicsItem):
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
         self.setAcceptHoverEvents(True)
         self.hover = False
+
+    def port_selected(self, mpos):
+        mpos_y = mpos.y()
+        idx = int((mpos_y - self.radius) // 16)
+        if idx > 0 and idx < len((self.pins)):
+            return list(self.pins)[idx]
+        return None
 
     def port_pos(self, port, other_node):
         pos = self.pos()
@@ -282,6 +291,13 @@ class MyNode(QGraphicsItem):
     def mouseReleaseEvent(self, event):
         QGraphicsItem.mouseReleaseEvent(self, event)
 
+    def mouseDoubleClickEvent(self, event):
+        port = None
+        if event.button() == Qt.MouseButton.LeftButton:
+            port = self.port_selected(event.pos())
+        if port:
+            self.parent.toggle_pin_graph(f"{self.title}.{port}")
+
 
 class NodeScene(QGraphicsScene):
     def __init__(self, x, y, w, h, parent):
@@ -351,15 +367,72 @@ class NodeViewer(QGraphicsView):
         super().mouseMoveEvent(event)
 
 
+class PinGraph(QWidget):
+    def __init__(self, data):
+        super().__init__()
+        self.data = data
+        self.width = 200
+        self.height = 200
+        self.setFixedWidth(self.width)
+        # self.setFixedHeight(self.height)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setFont(QFont("Arial", 12))
+        painter.setPen(QPen(Qt.GlobalColor.black, 1))
+
+        try:
+            gw = self.width
+            gh = 70
+            py = 10
+            for pin, data in self.data.items():
+                painter.setPen(QPen(Qt.GlobalColor.black, 1))
+                painter.drawText(QRectF(5, py, gw, 18), Qt.AlignmentFlag.AlignLeft, pin)
+                py += 18
+                if data["data"]:
+                    if data["min"] is None:
+                        data["min"] = float(data["data"][0])
+                        data["max"] = float(data["data"][0])
+                    for point in data["data"]:
+                        data["min"] = min(data["min"], float(point))
+                        data["max"] = max(data["max"], float(point))
+                    vdiff = data["max"] - data["min"]
+
+                    painter.fillRect(
+                        QRectF(0, py - 1, gw + 2, gh + 2), Qt.GlobalColor.white
+                    )
+                    painter.setPen(QPen(Qt.GlobalColor.blue, 1))
+
+                    if vdiff != 0:
+                        point = data["data"][0]
+                        gy_last = (float(point) - data["min"]) / vdiff * gh
+                        gx_last = gw
+                        for gn, point in enumerate(data["data"][1:]):
+                            gy = (float(point) - data["min"]) / vdiff * gh
+                            gx = gw - (gn * gw / data["len"])
+                            painter.drawLine(
+                                QPointF(gx_last, py + gy_last), QPointF(gx, py + gy)
+                            )
+                            gy_last = gy
+                            gx_last = gx
+
+                py += gh + 5
+        except Exception:
+            pass
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("HalView")
         self.resize(1200, 900)
 
+        self.pin_graph_data = {}
+        self.pin_graphs = []
         self.scene = NodeScene(-7000, -7000, 12000, 12000, self)
         self.view = NodeViewer(self.scene)
-        self.view.setZoom(1.0)
+        self.graphs = PinGraph(self.pin_graph_data)
 
         svg_data = self.export()
         self.root = ET.fromstring(svg_data)
@@ -375,7 +448,12 @@ class MainWindow(QMainWindow):
 
         vboxMain = QVBoxLayout()
         vboxMain.addWidget(button_fit)
-        vboxMain.addWidget(self.view)
+
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.splitter.addWidget(self.view)
+        self.splitter.addWidget(self.graphs)
+        self.splitter.setSizes([9999, 0])
+        vboxMain.addWidget(self.splitter)
 
         self.main = QWidget()
         self.setCentralWidget(self.main)
@@ -389,6 +467,12 @@ class MainWindow(QMainWindow):
         self.timer = QTimer()
         self.timer.timeout.connect(self.runTimer)
         self.timer.start(100)
+
+    def toggle_pin_graph(self, pin):
+        if pin in self.pin_graphs:
+            self.pin_graphs.remove(pin)
+        else:
+            self.pin_graphs.append(pin)
 
     def export(self):
         colors = {
@@ -643,7 +727,7 @@ class MainWindow(QMainWindow):
                 w = max(w, 70)
                 h = max(h, 40)
                 self.nodesdict[title.text] = MyNode(
-                    self.scene, x1, y1, w, h, title.text, pins
+                    self, x1, y1, w, h, title.text, pins
                 )
                 self.scene.addItem(self.nodesdict[title.text])
 
@@ -656,7 +740,7 @@ class MainWindow(QMainWindow):
                 begin_node, begin_pin = begin.split(":")
                 end_node, end_pin = end.split(":")
                 edge = NodeEdge(
-                    self.scene,
+                    self,
                     self.nodesdict[begin_node],
                     begin_pin,
                     self.nodesdict[end_node],
@@ -669,6 +753,18 @@ class MainWindow(QMainWindow):
                 self.edges[pin].append(edge)
 
     def runTimer(self):
+        for pin in self.pin_graphs:
+            if pin not in self.pin_graph_data:
+                self.pin_graph_data[pin] = {
+                    "data": [],
+                    "min": None,
+                    "max": None,
+                    "len": 50,
+                }
+        for pin in list(self.pin_graph_data):
+            if pin not in self.pin_graphs:
+                del self.pin_graph_data[pin]
+
         # get hal data
         listOfDicts = hal.get_info_pins()
         updates = set()
@@ -676,6 +772,20 @@ class MainWindow(QMainWindow):
             pinName = part.get("NAME")
             pinValue = part.get("VALUE")
             pinType = part.get("TYPE")
+
+            try:
+                # pin graph
+                self.pin_graph_data[pinName]
+                if pinName in self.pin_graph_data:
+                    self.pin_graph_data[pinName]["data"] = [
+                        pinValue,
+                        *self.pin_graph_data[pinName]["data"][
+                            : self.pin_graph_data[pin]["len"]
+                        ],
+                    ]
+            except Exception:
+                pass
+
             dataColor = Qt.GlobalColor.white
             if pinType == 1:
                 if pinValue:
@@ -699,6 +809,12 @@ class MainWindow(QMainWindow):
 
         for node in updates:
             node.update()
+
+        if self.pin_graph_data:
+            self.splitter.setSizes([9999, self.graphs.width])
+            self.graphs.update()
+        else:
+            self.splitter.setSizes([9999, 0])
 
     def fit_view(self):
         min_x = 99999
