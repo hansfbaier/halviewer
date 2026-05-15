@@ -41,6 +41,7 @@ if qtversion == "5":
         QMainWindow,
         QPushButton,
         QVBoxLayout,
+        QHBoxLayout,
         QWidget,
         QSplitter,
     )
@@ -64,6 +65,7 @@ else:
         QMainWindow,
         QPushButton,
         QVBoxLayout,
+        QHBoxLayout,
         QWidget,
         QSplitter,
     )
@@ -430,6 +432,7 @@ class MainWindow(QMainWindow):
 
         self.pin_graph_data = {}
         self.pin_graphs = []
+        self.run = True
         self.scene = NodeScene(-7000, -7000, 12000, 12000, self)
         self.view = NodeViewer(self.scene)
         self.graphs = PinGraph(self.pin_graph_data)
@@ -446,8 +449,15 @@ class MainWindow(QMainWindow):
         button_fit = QPushButton("Fit to Window")
         button_fit.clicked.connect(self.fit_view)
 
+        button_freeze = QPushButton("Freeze")
+        button_freeze.clicked.connect(self.freeze)
+
+        hboxButtons = QHBoxLayout()
+        hboxButtons.addWidget(button_fit)
+        hboxButtons.addWidget(button_freeze)
+
         vboxMain = QVBoxLayout()
-        vboxMain.addWidget(button_fit)
+        vboxMain.addLayout(hboxButtons)
 
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.splitter.addWidget(self.view)
@@ -753,6 +763,9 @@ class MainWindow(QMainWindow):
                 self.edges[pin].append(edge)
 
     def runTimer(self):
+        if not self.run:
+            return
+
         for pin in self.pin_graphs:
             if pin not in self.pin_graph_data:
                 self.pin_graph_data[pin] = {
@@ -815,6 +828,9 @@ class MainWindow(QMainWindow):
             self.graphs.update()
         else:
             self.splitter.setSizes([9999, 0])
+
+    def freeze(self):
+        self.run = 1 - self.run
 
     def fit_view(self):
         min_x = 99999
