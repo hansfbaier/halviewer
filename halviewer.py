@@ -427,7 +427,7 @@ class PinGraph(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("HalView")
+        self.setWindowTitle("LinuxCNC - HalViewer")
         self.resize(1200, 900)
 
         self.pin_graph_data = {}
