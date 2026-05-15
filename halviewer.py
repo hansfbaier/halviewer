@@ -2,6 +2,7 @@
 #
 #
 
+import argparse
 import subprocess
 import sys
 import uuid
@@ -10,16 +11,23 @@ import xml.etree.ElementTree as ET
 import graphviz
 import hal
 
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--interval", "-i", help="update interval", nargs="?", type=int, default=100
+)
+parser.add_argument(
+    "--buffer", "-b", help="linechart buffer size", nargs="?", type=int, default=50
+)
+parser.add_argument(
+    "--qt5", "-5", help="using pyqt5", default=False, action="store_true"
+)
+parser.add_argument(
+    "--qt6", "-6", help="using pyqt6", default=False, action="store_true"
+)
+args = parser.parse_args()
 qtversion = "5"
-if len(sys.argv) == 2:
-    if sys.argv[1] not in {"-5", "-6"}:
-        print("")
-        print(f"USAGE: {sys.argv[0]} [-5|-6]")
-        print("    -5: pyqt5 (default)")
-        print("    -6: pyqt6")
-        print("")
-        exit(1)
-    qtversion = sys.argv[1][1]
+if args.qt6:
+    qtversion = "6"
 
 if qtversion == "5":
     from PyQt5.QtCore import QPoint, QPointF, QRectF, QTimer, Qt
@@ -375,20 +383,24 @@ class PinGraph(QWidget):
     def __init__(self, data):
         super().__init__()
         self.data = data
-        self.width = 220
-        self.height = 200
-        self.setFixedWidth(self.width)
-        self.setFixedHeight(self.height)
-        self.setMinimumSize(self.width, self.height)
+        self.width = 0
+        self.height = 0
+        self.resize(self.width, self.height)
+
+    def resizeEvent(self, event):
+        self.width = event.size().width()
 
     def paintEvent(self, event):
+        if self.width < 10:
+            return
+
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setFont(QFont("Arial", 12))
         painter.setPen(QPen(Qt.GlobalColor.black, 1))
 
         try:
-            gw = self.width - 20
+            gw = self.width - 10
             gh = 70
             py = 10
             for pin, data in self.data.items():
@@ -489,7 +501,7 @@ class MainWindow(QMainWindow):
         # self.runTimer()
         self.timer = QTimer()
         self.timer.timeout.connect(self.runTimer)
-        self.timer.start(100)
+        self.timer.start(args.interval)
 
     def toggle_pin_graph(self, pin):
         if pin in self.pin_graphs:
@@ -498,10 +510,13 @@ class MainWindow(QMainWindow):
             self.pin_graphs.append(pin)
 
         if self.pin_graphs:
-            self.splitter.setSizes(
-                [self.geometry().width() - self.graphs.width, self.graphs.width]
-            )
-        else:
+            if self.graphs.width < 10:
+                self.graphs.width = 200
+                self.splitter.setSizes(
+                    [self.geometry().width() - self.graphs.width, self.graphs.width]
+                )
+        elif self.graphs.width > 100:
+            self.graphs.width = 0
             self.splitter.setSizes([self.geometry().width(), 0])
 
     def export(self):
@@ -792,7 +807,7 @@ class MainWindow(QMainWindow):
                     "data": [],
                     "min": None,
                     "max": None,
-                    "len": 50,
+                    "len": args.buffer,
                 }
         for pin in list(self.pin_graph_data):
             if pin not in self.pin_graphs:
