@@ -10,6 +10,8 @@ import sys
 import uuid
 import xml.etree.ElementTree as ET
 
+from functools import partial
+
 import graphviz
 import hal
 
@@ -37,6 +39,7 @@ if qtversion == "5":
     )
     from PyQt5.QtWidgets import (
         QApplication,
+        QCheckBox,
         QGraphicsItem,
         QGraphicsPathItem,
         QGraphicsScene,
@@ -62,6 +65,7 @@ else:
     )
     from PyQt6.QtWidgets import (
         QApplication,
+        QCheckBox,
         QGraphicsItem,
         QGraphicsPathItem,
         QGraphicsScene,
@@ -132,7 +136,7 @@ class NodeEdge(QGraphicsPathItem):
         self.update()
 
 
-class MyNode(QGraphicsItem):
+class CompNode(QGraphicsItem):
     name = ""
     radius = 5
     border_size = 4
@@ -168,8 +172,8 @@ class MyNode(QGraphicsItem):
 
     def port_selected(self, mpos):
         mpos_y = mpos.y()
-        idx = int((mpos_y - self.radius) // 16)
-        if idx > 0 and idx < len((self.pins)):
+        idx = int((mpos_y - self.radius - 16) // 16)
+        if idx >= 0 and idx < len((self.pins)):
             return list(self.pins)[idx]
         return None
 
@@ -184,12 +188,11 @@ class MyNode(QGraphicsItem):
             pos_x += 8
         if port in self.pins:
             idx = list(self.pins).index(port)
-            pos_y += self.radius + idx * 16 + 8
-
+            pos_y += self.radius + 16 + idx * 16 + 8
         return QPointF(pos_x, pos_y)
 
     def boundingRect(self):
-        self.height = len(self.pins) * 16 + self.radius * 2
+        self.height = len(self.pins) * 16 + 16 + self.radius * 2
         return QRectF(0, 0, self.width, self.height)
 
     def paintArrow(self, painter, x, y, direction):
@@ -224,6 +227,8 @@ class MyNode(QGraphicsItem):
             pen = QPen(self.border_color_selected, self.border_size)
         else:
             pen = QPen(self.border_color, self.border_size)
+        painter.setPen(QPen(self.title_color, 1))
+        painter.setFont(QFont(self.text_font, self.title_size))
 
         # title
         rect = self.boundingRect()
@@ -247,53 +252,50 @@ class MyNode(QGraphicsItem):
         brush = QBrush(QColor(150, 150, 200))
         painter.setBrush(brush)
         painter.fillPath(title_path, painter.brush())
+        py = self.radius
+        painter.setPen(QPen(self.title_color, 1))
+        painter.drawText(
+            QRectF(0, py - 3, self.width, 16),
+            Qt.AlignmentFlag.AlignCenter,
+            self.title,
+        )
+        py += 16
 
         # border
         painter.setPen(pen)
         painter.strokePath(path, painter.pen())
 
         # pin text
-        painter.setPen(QPen(self.title_color, 1))
-        painter.setFont(QFont(self.text_font, self.title_size))
-        py = self.radius
         for pin_name, pin_data in self.pins.items():
             pin_title = pin_data["pin"]
             value = pin_data["value"]
             pininfo = pin_data["pininfo"]
-            if not pininfo:
-                painter.setPen(QPen(self.title_color, 1))
+            direction = pininfo["direction"]
+            signal = pininfo["signal"]
+            if signal is None:
+                painter.setPen(QPen(self.info_color, 1))
                 painter.drawText(
-                    QRectF(0, py - 3, self.width, 16),
+                    QRectF(0, py, self.width, 16),
                     Qt.AlignmentFlag.AlignCenter,
-                    f"{pin_title}",
+                    f"{pin_title}={value}",
                 )
             else:
-                direction = pininfo["direction"]
-                signal = pininfo["signal"]
-                if signal is None:
-                    painter.setPen(QPen(self.info_color, 1))
-                    painter.drawText(
-                        QRectF(0, py, self.width, 16),
-                        Qt.AlignmentFlag.AlignCenter,
-                        f"{pin_title}={value}",
-                    )
+                if direction == "IN":
+                    self.paintArrow(painter, 8, py + 8, "RIGHT")
+                    self.paintArrow(painter, self.width - 8, py + 8, "LEFT")
+                elif direction == "OUT":
+                    self.paintArrow(painter, 8, py + 8, "LEFT")
+                    self.paintArrow(painter, self.width - 8, py + 8, "RIGHT")
                 else:
-                    if direction == "IN":
-                        self.paintArrow(painter, 8, py + 8, "RIGHT")
-                        self.paintArrow(painter, self.width - 8, py + 8, "LEFT")
-                    elif direction == "OUT":
-                        self.paintArrow(painter, 8, py + 8, "LEFT")
-                        self.paintArrow(painter, self.width - 8, py + 8, "RIGHT")
-                    else:
-                        self.paintArrow(painter, 8, py + 8, "BOTH")
-                        self.paintArrow(painter, self.width - 8, py + 8, "BOTH")
+                    self.paintArrow(painter, 8, py + 8, "BOTH")
+                    self.paintArrow(painter, self.width - 8, py + 8, "BOTH")
 
-                    painter.setPen(QPen(self.title_color, 1))
-                    painter.drawText(
-                        QRectF(0, py, self.width, 16),
-                        Qt.AlignmentFlag.AlignCenter,
-                        f"{pin_title}={value}",
-                    )
+                painter.setPen(QPen(self.title_color, 1))
+                painter.drawText(
+                    QRectF(0, py, self.width, 16),
+                    Qt.AlignmentFlag.AlignCenter,
+                    f"{pin_title}={value}",
+                )
             py += 16
 
     def hoverEnterEvent(self, event):
@@ -318,8 +320,10 @@ class MyNode(QGraphicsItem):
         port = None
         if event.button() == Qt.MouseButton.LeftButton:
             port = self.port_selected(event.pos())
-        if port:
-            self.parent.toggle_pin_graph(f"{self.title}.{port}")
+            if port:
+                self.parent.toggle_pin_graph(f"{self.title}.{port}")
+            else:
+                self.parent.toggle_group_graph(f"{self.title.split('.')[0]}.")
 
 
 class NodeScene(QGraphicsScene):
@@ -330,9 +334,10 @@ class NodeScene(QGraphicsScene):
 
 
 class NodeViewer(QGraphicsView):
-    def __init__(self, scene):
+    def __init__(self, parent):
         super().__init__()
-        self.scene = scene
+        self.parent = parent
+        self.scene = parent.scene
         self.setScene(self.scene)
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.setTransformationAnchor(self.ViewportAnchor.AnchorUnderMouse)
@@ -371,6 +376,12 @@ class NodeViewer(QGraphicsView):
         self.button_pressed = 0
         super().mouseReleaseEvent(event)
 
+    def mouseDoubleClickEvent(self, event):
+        if event.button() in [Qt.MouseButton.RightButton]:
+            self.parent.fit_view()
+        else:
+            super().mouseDoubleClickEvent(event)
+
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         self.mouse_pos_last = event.pos()
         if self.button_pressed in [Qt.MouseButton.LeftButton]:
@@ -387,15 +398,25 @@ class NodeViewer(QGraphicsView):
 
 
 class LineCharts(QWidget):
-    def __init__(self, data):
+    def __init__(self, parent):
         super().__init__()
-        self.data = data
+        self.parent = parent
+        self.data = self.parent.pin_graph_data
         self.width = 0
         self.height = 0
         self.resize(self.width, self.height)
 
     def resizeEvent(self, event):
         self.width = event.size().width()
+
+    def mouseDoubleClickEvent(self, event):
+        mpos_y = event.pos().y()
+        py = 10
+        gh = 70
+        idx = int((mpos_y - py) // (22 + gh + 5))
+        if idx < len(self.parent.nodesetup["linecharts"]):
+            self.parent.nodesetup["linecharts"].pop(idx)
+        self.parent.writeSetup()
 
     def paintEvent(self, event):
         if self.width < 10:
@@ -456,6 +477,67 @@ class LineCharts(QWidget):
 
 
 class MainWindow(QMainWindow):
+    default_grouping = ["halui.", "pyvcp.", "qtpyvcp.", "gladevcp.", "qtdragon.", "flexhal.", "rio-gui."]
+    grouping = []
+    cfilter = (
+        "halui.",
+        "joint.",
+        "pid.",
+        "spindle.",
+        "iocontrol.",
+        "axis.",
+        "motion.digital-in-",
+        "motion.digital-out-",
+        "motion.feed-",
+        "motion.tooloffset.",
+        "motion.analog-in-",
+        "motion.analog-out-",
+        "motion-command-handler.time",
+        "motion-controller.time",
+        "motion.adaptive-feed",
+        "motion.coord-error",
+        "motion.coord-mode",
+        "motion.current-vel",
+        "motion.distance-to-go",
+        "motion.eoffset-active",
+        "motion.eoffset-limited",
+        "motion.homing-inhibit",
+        "motion.in-position",
+        "motion.jog-inhibit",
+        "motion.jog-is-active",
+        "motion.jog-stop",
+        "motion.jog-stop-immediate",
+        "motion.on-soft-limit",
+        "motion.requested-vel",
+        "motion.servo.last-period",
+        "motion.tp-reverse",
+    )
+    pfilter = (
+        "-not",
+        "-abs",
+        "-s32",
+        "-u32",
+        ".maxcmdD",
+        ".maxcmdDD",
+        ".maxcmdDDD",
+        ".maxerror",
+        ".maxerrorD",
+        ".maxerrorI",
+        ".maxoutput",
+        ".saturated",
+        ".saturated-count",
+        ".saturated-s",
+        ".tune-cycles",
+        ".tune-effort",
+        ".tune-mode",
+        ".tune-start",
+        ".tune-type",
+        ".command-deriv",
+        ".do-pid-calcs.time",
+        ".error-previous-target",
+        ".feedback-deriv",
+    )
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("LinuxCNC - HalViewer")
@@ -472,39 +554,57 @@ class MainWindow(QMainWindow):
             self.nodesetup["linecharts"] = []
         if "positions" not in self.nodesetup:
             self.nodesetup["positions"] = {}
+        if "grouping" not in self.nodesetup:
+            self.nodesetup["grouping"] = self.default_grouping[0:]
+        if "unconnected" not in self.nodesetup:
+            self.nodesetup["unconnected"] = True
+        if "namesort" not in self.nodesetup:
+            self.nodesetup["namesort"] = True
+        if "dirsort" not in self.nodesetup:
+            self.nodesetup["dirsort"] = False
 
-        self.resize(1200, 900)
         self.pin_graph_data = {}
-        self.pin_graphs = self.nodesetup["linecharts"]
         self.run = True
+        self.resize(1200, 900)
         self.scene = NodeScene(-7000, -7000, 12000, 12000, self)
-        self.view = NodeViewer(self.scene)
-        self.charts = LineCharts(self.pin_graph_data)
+        self.view = NodeViewer(self)
+        self.charts = LineCharts(self)
 
         svg_data = self.export()
         self.root = ET.fromstring(svg_data)
         if self.root is None:
             print("ERROR parsing ini file")
             exit(0)
-        # open("/tmp/g.svg", "w").write(svg_data.decode())
 
         self.h = hal.component(f"halview-{uuid.uuid4()}")
 
+        hboxButtons = QHBoxLayout()
+        hboxBoxes = QHBoxLayout()
+
+        for tval in ("unconnected", "namesort", "dirsort"):
+            checkbox = QCheckBox(tval.title())
+            checkbox.setChecked(self.nodesetup[tval])
+            checkbox.stateChanged.connect(partial(self.toggle, tval))
+            hboxBoxes.addWidget(checkbox, stretch=0)
+
+        button_reset_grouping = QPushButton("Reset grouping")
+        button_reset_grouping.clicked.connect(self.reset_grouping)
+        hboxButtons.addWidget(button_reset_grouping, stretch=0)
+
+        button_reset_layout = QPushButton("Reset layout")
+        button_reset_layout.clicked.connect(self.reset_layout)
+        hboxButtons.addWidget(button_reset_layout, stretch=0)
+
         button_fit = QPushButton("Fit to Window")
         button_fit.clicked.connect(self.fit_view)
-
-        button_reset = QPushButton("Reset settings")
-        button_reset.clicked.connect(self.reset_settings)
+        hboxButtons.addWidget(button_fit, stretch=0)
 
         button_freeze = QPushButton("Freeze")
         button_freeze.clicked.connect(self.freeze)
-
-        hboxButtons = QHBoxLayout()
-        hboxButtons.addWidget(button_reset)
-        hboxButtons.addWidget(button_fit)
-        hboxButtons.addWidget(button_freeze)
+        hboxButtons.addWidget(button_freeze, stretch=0)
 
         vboxMain = QVBoxLayout()
+        hboxButtons.addStretch()
         vboxMain.addLayout(hboxButtons)
 
         linecharts = QScrollArea()
@@ -518,6 +618,8 @@ class MainWindow(QMainWindow):
         self.splitter.addWidget(linecharts)
         self.splitter.setSizes([self.geometry().width() - self.charts.width, 0])
         vboxMain.addWidget(self.splitter)
+        hboxBoxes.addStretch()
+        vboxMain.addLayout(hboxBoxes)
 
         self.main = QWidget()
         self.setCentralWidget(self.main)
@@ -528,21 +630,33 @@ class MainWindow(QMainWindow):
         self.show()
         self.fit_view()
 
-        # self.runTimer()
         self.timer = QTimer()
         self.timer.timeout.connect(self.runTimer)
         self.timer.start(args.interval)
 
-    def reset_settings(self):
-        self.nodesetup["linecharts"] = []
-        self.nodesetup["positions"] = {}
-        self.pin_graph_data = {}
-        self.pin_graphs = []
+    def toggle(self, name, value):
+        self.nodesetup[name] = bool(value)
+        self.reload()
+        self.fit_view()
+
+    def reload(self):
+        svg_data = self.export()
+        self.root = ET.fromstring(svg_data)
         self.readGraph()
+        self.writeSetup()
+
+    def reset_grouping(self):
+        self.nodesetup["grouping"] = self.default_grouping[0:]
+        self.reload()
+        self.fit_view()
+
+    def reset_layout(self):
+        self.nodesetup["positions"] = {}
+        self.reload()
         self.fit_view()
 
     def check_splitter(self):
-        if self.pin_graphs:
+        if self.nodesetup["linecharts"]:
             if self.charts.width < 10:
                 self.charts.width = 200
                 self.splitter.setSizes([self.geometry().width() - self.charts.width, self.charts.width])
@@ -550,12 +664,20 @@ class MainWindow(QMainWindow):
             self.charts.width = 0
             self.splitter.setSizes([self.geometry().width(), 0])
 
-    def toggle_pin_graph(self, pin):
-        if pin in self.pin_graphs:
-            self.pin_graphs.remove(pin)
+    def toggle_group_graph(self, group):
+        if group in self.nodesetup["grouping"]:
+            self.nodesetup["grouping"].remove(group)
         else:
-            self.pin_graphs.append(pin)
+            self.nodesetup["grouping"].append(group)
+        self.reload()
+
+    def toggle_pin_graph(self, pin):
+        if pin in self.nodesetup["linecharts"]:
+            self.nodesetup["linecharts"].remove(pin)
+        else:
+            self.nodesetup["linecharts"].append(pin)
         self.check_splitter()
+        self.writeSetup()
 
     def export(self):
         colors = {
@@ -613,7 +735,7 @@ class MainWindow(QMainWindow):
                             self.signals[signal]["targets"].append(name)
                         else:
                             self.signals[signal]["source"] = name
-                else:
+                elif self.nodesetup["unconnected"]:
                     owner, vtype, direction, value, name = line.split()
                     self.pininfo[name] = {
                         "owner": owner,
@@ -624,62 +746,7 @@ class MainWindow(QMainWindow):
                         "arrow": None,
                         "signal": None,
                     }
-                    cfilter = (
-                        "halui.",
-                        "joint.",
-                        "pid.",
-                        "spindle.",
-                        "iocontrol.",
-                        "axis.",
-                        "motion.digital-in-",
-                        "motion.digital-out-",
-                        "motion.feed-",
-                        "motion.tooloffset.",
-                        "motion.analog-in-",
-                        "motion.analog-out-",
-                        "motion-command-handler.time",
-                        "motion-controller.time",
-                        "motion.adaptive-feed",
-                        "motion.coord-error",
-                        "motion.coord-mode",
-                        "motion.current-vel",
-                        "motion.distance-to-go",
-                        "motion.eoffset-active",
-                        "motion.eoffset-limited",
-                        "motion.homing-inhibit",
-                        "motion.in-position",
-                        "motion.jog-inhibit",
-                        "motion.jog-is-active",
-                        "motion.jog-stop",
-                        "motion.jog-stop-immediate",
-                        "motion.on-soft-limit",
-                        "motion.requested-vel",
-                        "motion.servo.last-period",
-                        "motion.tp-reverse",
-                    )
-                    pfilter = (
-                        "-not",
-                        ".maxcmdD",
-                        ".maxcmdDD",
-                        ".maxcmdDDD",
-                        ".maxerror",
-                        ".maxerrorD",
-                        ".maxerrorI",
-                        ".maxoutput",
-                        ".saturated",
-                        ".saturated-count",
-                        ".saturated-s",
-                        ".tune-cycles",
-                        ".tune-effort",
-                        ".tune-mode",
-                        ".tune-start",
-                        ".tune-type",
-                        ".command-deriv",
-                        ".do-pid-calcs.time",
-                        ".error-previous-target",
-                        ".feedback-deriv",
-                    )
-                    if not name.startswith((cfilter)) and not name.endswith(pfilter):
+                    if not name.startswith((self.cfilter)) and not name.endswith(self.pfilter):
                         # print(name)
                         self.setps[name] = value
 
@@ -689,7 +756,7 @@ class MainWindow(QMainWindow):
             source_value = parts.get("source_value")
             source_group = ".".join(source_parts[:-1])
             source_pin = source_parts[-1]
-            if source_group.startswith("halui.") or "vcp." in source_group or "qtdragon" in source_group:
+            if source_group.startswith(tuple(self.nodesetup["grouping"])):
                 source_group = ".".join(source_parts[0:1])
                 source_pin = ".".join(source_parts[1:])
 
@@ -710,7 +777,7 @@ class MainWindow(QMainWindow):
                 target_parts = target.split(".")
                 target_group = ".".join(target_parts[:-1])
                 target_pin = target_parts[-1]
-                if target_group.startswith("halui.") or "vcp." in target_group or "qtdragon" in target_group:
+                if target_group.startswith(tuple(self.nodesetup["grouping"])):
                     target_group = ".".join(target_parts[0:1])
                     target_pin = ".".join(target_parts[1:])
                 target_name = f"{target_group}:{target_pin}"
@@ -792,16 +859,34 @@ class MainWindow(QMainWindow):
                         y2 = max(float(y), y2)
 
                 pins = {}
-                for text in node.findall(".//{http://www.w3.org/2000/svg}text"):
-                    pin_name = text.text.split("=")[0]
-                    pdict = {
-                        "node": title.text,
-                        "pin": pin_name,
-                        "value": None,
-                        "pininfo": self.pininfo.get(f"{title.text}.{pin_name}", {}),
-                    }
-                    pins[pin_name] = pdict
-                    if title.text != pin_name:
+                pinlist = []
+                pintext = node.findall(".//{http://www.w3.org/2000/svg}text")
+                for text in pintext:
+                    pinlist.append(text.text.split("=")[0])
+
+                if self.nodesetup["namesort"]:
+                    pinlist = sorted(pinlist)
+                if self.nodesetup["dirsort"] or len(pintext) < 7:
+                    sorting = ("IN", "INOUT", "OUT", None)
+                else:
+                    sorting = ("OFF",)
+                for skey in sorting:
+                    for pin_name in pinlist:
+                        if title.text == pin_name:
+                            continue
+                        if skey != "OFF":
+                            check = self.pininfo.get(f"{title.text}.{pin_name}", {}).get("direction")
+                            if self.pininfo.get(f"{title.text}.{pin_name}", {}).get("signal") is None:
+                                check = None
+                            if check != skey:
+                                continue
+                        pdict = {
+                            "node": title.text,
+                            "pin": pin_name,
+                            "value": None,
+                            "pininfo": self.pininfo.get(f"{title.text}.{pin_name}", {}),
+                        }
+                        pins[pin_name] = pdict
                         self.pinsdict[f"{title.text}.{pin_name}"] = pdict
 
                 w = abs(x2 - x1) + 30
@@ -810,29 +895,29 @@ class MainWindow(QMainWindow):
                 h = max(h, 40)
                 if title.text in self.nodesetup["positions"]:
                     x1, y1 = self.nodesetup["positions"][title.text]
-                self.nodesdict[title.text] = MyNode(self, x1, y1, w, h, title.text, pins)
+                self.nodesdict[title.text] = CompNode(self, x1, y1, w, h, title.text, pins)
                 self.scene.addItem(self.nodesdict[title.text])
 
         self.edges = {}
-        nodes = self.root.findall(".//*[@class='edge']")
-        for node in nodes:
-            title = node.find(".//{http://www.w3.org/2000/svg}title")
+        edges = self.root.findall(".//*[@class='edge']")
+        for edge in edges:
+            title = edge.find(".//{http://www.w3.org/2000/svg}title")
             if title is not None:
                 begin, end = title.text.split("->")
                 begin_node, begin_pin = begin.split(":")
                 end_node, end_pin = end.split(":")
-                edge = NodeEdge(
+                edgenode = NodeEdge(
                     self,
                     self.nodesdict[begin_node],
                     begin_pin,
                     self.nodesdict[end_node],
                     end_pin,
                 )
-                self.scene.addItem(edge)
+                self.scene.addItem(edgenode)
                 pin = f"{begin_node}.{begin_pin}"
                 if pin not in self.edges:
                     self.edges[pin] = []
-                self.edges[pin].append(edge)
+                self.edges[pin].append(edgenode)
         self.writeSetup()
 
     def writeSetup(self):
@@ -843,7 +928,7 @@ class MainWindow(QMainWindow):
         if not self.run:
             return
 
-        for pin in self.pin_graphs:
+        for pin in self.nodesetup["linecharts"]:
             if pin not in self.pin_graph_data:
                 self.pin_graph_data[pin] = {
                     "data": [],
@@ -852,7 +937,7 @@ class MainWindow(QMainWindow):
                     "len": args.buffer,
                 }
         for pin in list(self.pin_graph_data):
-            if pin not in self.pin_graphs:
+            if pin not in self.nodesetup["linecharts"]:
                 del self.pin_graph_data[pin]
 
         # get hal data
@@ -897,8 +982,7 @@ class MainWindow(QMainWindow):
         for node in updates:
             node.update()
 
-        if self.pin_graph_data:
-            self.charts.update()
+        self.charts.update()
 
     def freeze(self):
         self.run = 1 - self.run
