@@ -460,6 +460,11 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("LinuxCNC - HalViewer")
 
         self.nodesetup = {}
+        if not args.setup:
+            result = subprocess.run(["halreport"], stdout=subprocess.PIPE, check=False)
+            for line in result.stdout.decode().split("\n"):
+                if line.startswith("INI_FILE_NAME:"):
+                    args.setup = f"{os.path.dirname(line.split()[-1])}/halviewer.json"
         if args.setup and os.path.isfile(args.setup):
             self.nodesetup = json.loads(open(args.setup, "r").read())
         if "linecharts" not in self.nodesetup:
@@ -487,10 +492,14 @@ class MainWindow(QMainWindow):
         button_fit = QPushButton("Fit to Window")
         button_fit.clicked.connect(self.fit_view)
 
+        button_reset = QPushButton("Reset settings")
+        button_reset.clicked.connect(self.reset_settings)
+
         button_freeze = QPushButton("Freeze")
         button_freeze.clicked.connect(self.freeze)
 
         hboxButtons = QHBoxLayout()
+        hboxButtons.addWidget(button_reset)
         hboxButtons.addWidget(button_fit)
         hboxButtons.addWidget(button_freeze)
 
@@ -522,6 +531,12 @@ class MainWindow(QMainWindow):
         self.timer = QTimer()
         self.timer.timeout.connect(self.runTimer)
         self.timer.start(args.interval)
+
+    def reset_settings(self):
+        self.nodesetup["linecharts"] = []
+        self.nodesetup["positions"] = {}
+        self.readGraph()
+        self.fit_view()
 
     def check_splitter(self):
         if self.pin_graphs:
@@ -749,6 +764,10 @@ class MainWindow(QMainWindow):
         return self.gAll.pipe()
 
     def readGraph(self):
+        # clean scene
+        for item in self.scene.items():
+            self.scene.removeItem(item)
+
         self.pinsdict = {}
         self.nodesdict = {}
 
