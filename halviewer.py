@@ -184,6 +184,16 @@ class MyNode(QGraphicsItem):
         self.height = len(self.pins) * 16 + self.radius * 2
         return QRectF(0, 0, self.width, self.height)
 
+    def paintArrow(self, painter, x, y, direction):
+        if direction == "LEFT":
+            painter.drawLine(QPointF(x - 3, y), QPointF(x + 3, y))
+            painter.drawLine(QPointF(x - 3, y), QPointF(x + 1, y - 2))
+            painter.drawLine(QPointF(x - 3, y), QPointF(x + 1, y + 2))
+        else:
+            painter.drawLine(QPointF(x - 3, y), QPointF(x + 3, y))
+            painter.drawLine(QPointF(x - 1, y - 2), QPointF(x + 3, y))
+            painter.drawLine(QPointF(x - 1, y + 2), QPointF(x + 3, y))
+
     def paintPort(self, painter, x, y, direction):
         painter.fillRect(QRectF(x - 5, y - 5, 10, 10), Qt.GlobalColor.yellow)
         if direction == "IN":
@@ -240,45 +250,12 @@ class MyNode(QGraphicsItem):
                     self.paintPort(painter, 8, py + 8, direction)
                     self.paintPort(painter, self.width - 8, py + 8, direction)
                     if direction == "IN":
-                        painter.drawLine(QPointF(15, py + 8), QPointF(15 + 5, py + 8))
-                        painter.drawLine(
-                            QPointF(15 + 2, py + 8 - 2), QPointF(15 + 5, py + 8)
-                        )
-                        painter.drawLine(
-                            QPointF(15 + 2, py + 8 + 2), QPointF(15 + 5, py + 8)
-                        )
-                        painter.drawLine(
-                            QPointF(self.width - 15, py + 8),
-                            QPointF(self.width - 15 - 5, py + 8),
-                        )
-                        painter.drawLine(
-                            QPointF(self.width - 15 - 2, py + 8 - 2),
-                            QPointF(self.width - 15 - 5, py + 8),
-                        )
-                        painter.drawLine(
-                            QPointF(self.width - 15 - 2, py + 8 + 2),
-                            QPointF(self.width - 15 - 5, py + 8),
-                        )
+                        self.paintArrow(painter, 18, py + 8, "RIGHT")
+                        self.paintArrow(painter, self.width - 18, py + 8, "LEFT")
                     else:
-                        painter.drawLine(QPointF(15, py + 8), QPointF(15 + 5, py + 8))
-                        painter.drawLine(
-                            QPointF(15, py + 8), QPointF(15 + 3, py + 8 - 2)
-                        )
-                        painter.drawLine(
-                            QPointF(15, py + 8), QPointF(15 + 3, py + 8 + 2)
-                        )
-                        painter.drawLine(
-                            QPointF(self.width - 15, py + 8),
-                            QPointF(self.width - 15 - 5, py + 8),
-                        )
-                        painter.drawLine(
-                            QPointF(self.width - 15, py + 8),
-                            QPointF(self.width - 15 - 3, py + 8 - 2),
-                        )
-                        painter.drawLine(
-                            QPointF(self.width - 15, py + 8),
-                            QPointF(self.width - 15 - 3, py + 8 + 2),
-                        )
+                        self.paintArrow(painter, 18, py + 8, "LEFT")
+                        self.paintArrow(painter, self.width - 18, py + 8, "RIGHT")
+
                     painter.drawText(
                         QRectF(0, py, self.width, 16),
                         Qt.AlignmentFlag.AlignCenter,
