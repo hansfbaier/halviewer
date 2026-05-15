@@ -409,19 +409,20 @@ class LineCharts(QWidget):
         try:
             gw = self.width - 10
             gh = 70
+            px = 5
             py = 10
             for pin, data in self.data.items():
                 painter.setPen(QPen(Qt.GlobalColor.black, 1))
                 if not data["data"]:
-                    painter.drawText(QRectF(5, py, gw, 18), Qt.AlignmentFlag.AlignLeft, pin)
-                    py += 20
+                    painter.drawText(QRectF(5, py, gw, 22), Qt.AlignmentFlag.AlignLeft, pin)
+                    py += 22
                 else:
                     painter.drawText(
-                        QRectF(5, py, gw, 18),
+                        QRectF(5, py, gw, 22),
                         Qt.AlignmentFlag.AlignLeft,
                         f"{pin}: {data['data'][0]}",
                     )
-                    py += 20
+                    py += 22
 
                     if data["min"] is None:
                         data["min"] = float(data["data"][0])
@@ -431,7 +432,7 @@ class LineCharts(QWidget):
                         data["max"] = max(data["max"], float(point))
                     vdiff = data["max"] - data["min"]
 
-                    painter.fillRect(QRectF(0, py - 1, gw + 2, gh + 2), Qt.GlobalColor.white)
+                    painter.fillRect(QRectF(px, py - 1, gw + 2, gh + 2), Qt.GlobalColor.gray)
                     painter.setPen(QPen(Qt.GlobalColor.blue, 1))
 
                     if vdiff != 0:
@@ -440,7 +441,7 @@ class LineCharts(QWidget):
                         gx_last = gw
                         for gn, point in enumerate(data["data"][1:]):
                             gy = (float(point) - data["min"]) / vdiff * gh
-                            gx = gw - (gn * gw / data["len"])
+                            gx = px + gw - (gn * gw / data["len"])
                             painter.drawLine(QPointF(gx_last, py + gy_last), QPointF(gx, py + gy))
                             gy_last = gy
                             gx_last = gx
@@ -535,6 +536,8 @@ class MainWindow(QMainWindow):
     def reset_settings(self):
         self.nodesetup["linecharts"] = []
         self.nodesetup["positions"] = {}
+        self.pin_graph_data = {}
+        self.pin_graphs = []
         self.readGraph()
         self.fit_view()
 
