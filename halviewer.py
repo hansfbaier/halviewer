@@ -2,9 +2,9 @@
 #
 #
 
-import os
-import json
 import argparse
+import json
+import os
 import subprocess
 import sys
 import uuid
@@ -15,16 +15,10 @@ import hal
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--interval", "-i", help="update interval", type=int, default=100)
-parser.add_argument(
-    "--buffer", "-b", help="linechart buffer size", type=int, default=50
-)
+parser.add_argument("--buffer", "-b", help="linechart buffer size", type=int, default=50)
 parser.add_argument("--setup", "-s", help="setup file", type=str, default="")
-parser.add_argument(
-    "--qt5", "-5", help="using pyqt5", default=False, action="store_true"
-)
-parser.add_argument(
-    "--qt6", "-6", help="using pyqt6", default=False, action="store_true"
-)
+parser.add_argument("--qt5", "-5", help="using pyqt5", default=False, action="store_true")
+parser.add_argument("--qt6", "-6", help="using pyqt6", default=False, action="store_true")
 args = parser.parse_args()
 qtversion = "5"
 if args.qt6:
@@ -43,17 +37,17 @@ if qtversion == "5":
     )
     from PyQt5.QtWidgets import (
         QApplication,
-        QScrollArea,
         QGraphicsItem,
         QGraphicsPathItem,
         QGraphicsScene,
         QGraphicsView,
+        QHBoxLayout,
         QMainWindow,
         QPushButton,
-        QVBoxLayout,
-        QHBoxLayout,
-        QWidget,
+        QScrollArea,
         QSplitter,
+        QVBoxLayout,
+        QWidget,
     )
 else:
     from PyQt6.QtCore import QPoint, QPointF, QRectF, QTimer, Qt
@@ -68,17 +62,17 @@ else:
     )
     from PyQt6.QtWidgets import (
         QApplication,
-        QScrollArea,
         QGraphicsItem,
         QGraphicsPathItem,
         QGraphicsScene,
         QGraphicsView,
+        QHBoxLayout,
         QMainWindow,
         QPushButton,
-        QVBoxLayout,
-        QHBoxLayout,
-        QWidget,
+        QScrollArea,
         QSplitter,
+        QVBoxLayout,
+        QWidget,
     )
 
 
@@ -205,12 +199,19 @@ class MyNode(QGraphicsItem):
             path.lineTo(QPointF(x + 5, y + 5))
             path.lineTo(QPointF(x + 5, y - 5))
             path.lineTo(QPointF(x - 5, y))
-        else:
+        elif direction == "RIGHT":
             path = QPainterPath()
             path.moveTo(QPointF(x + 5, y))
             path.lineTo(QPointF(x - 5, y + 5))
             path.lineTo(QPointF(x - 5, y - 5))
             path.lineTo(QPointF(x + 5, y))
+        else:
+            path = QPainterPath()
+            path.moveTo(QPointF(x + 5, y + 5))
+            path.lineTo(QPointF(x - 5, y + 5))
+            path.lineTo(QPointF(x - 5, y - 5))
+            path.lineTo(QPointF(x + 5, y - 5))
+            path.lineTo(QPointF(x + 5, y + 5))
         painter.setPen(QPen(Qt.GlobalColor.black, 1))
         painter.setBrush(QBrush(Qt.GlobalColor.yellow))
         painter.fillPath(path, painter.brush())
@@ -280,9 +281,12 @@ class MyNode(QGraphicsItem):
                     if direction == "IN":
                         self.paintArrow(painter, 8, py + 8, "RIGHT")
                         self.paintArrow(painter, self.width - 8, py + 8, "LEFT")
-                    else:
+                    elif direction == "OUT":
                         self.paintArrow(painter, 8, py + 8, "LEFT")
                         self.paintArrow(painter, self.width - 8, py + 8, "RIGHT")
+                    else:
+                        self.paintArrow(painter, 8, py + 8, "BOTH")
+                        self.paintArrow(painter, self.width - 8, py + 8, "BOTH")
 
                     painter.setPen(QPen(self.title_color, 1))
                     painter.drawText(
@@ -376,12 +380,8 @@ class NodeViewer(QGraphicsView):
             offset = self.mouse_pos - event.pos()
             self.mouse_pos = event.pos()
             dx, dy = offset.x(), offset.y()
-            self.horizontalScrollBar().setValue(
-                int(self.horizontalScrollBar().value() + dx)
-            )
-            self.verticalScrollBar().setValue(
-                int(self.verticalScrollBar().value() + dy)
-            )
+            self.horizontalScrollBar().setValue(int(self.horizontalScrollBar().value() + dx))
+            self.verticalScrollBar().setValue(int(self.verticalScrollBar().value() + dy))
 
         super().mouseMoveEvent(event)
 
@@ -413,9 +413,7 @@ class LineCharts(QWidget):
             for pin, data in self.data.items():
                 painter.setPen(QPen(Qt.GlobalColor.black, 1))
                 if not data["data"]:
-                    painter.drawText(
-                        QRectF(5, py, gw, 18), Qt.AlignmentFlag.AlignLeft, pin
-                    )
+                    painter.drawText(QRectF(5, py, gw, 18), Qt.AlignmentFlag.AlignLeft, pin)
                     py += 20
                 else:
                     painter.drawText(
@@ -433,9 +431,7 @@ class LineCharts(QWidget):
                         data["max"] = max(data["max"], float(point))
                     vdiff = data["max"] - data["min"]
 
-                    painter.fillRect(
-                        QRectF(0, py - 1, gw + 2, gh + 2), Qt.GlobalColor.white
-                    )
+                    painter.fillRect(QRectF(0, py - 1, gw + 2, gh + 2), Qt.GlobalColor.white)
                     painter.setPen(QPen(Qt.GlobalColor.blue, 1))
 
                     if vdiff != 0:
@@ -445,9 +441,7 @@ class LineCharts(QWidget):
                         for gn, point in enumerate(data["data"][1:]):
                             gy = (float(point) - data["min"]) / vdiff * gh
                             gx = gw - (gn * gw / data["len"])
-                            painter.drawLine(
-                                QPointF(gx_last, py + gy_last), QPointF(gx, py + gy)
-                            )
+                            painter.drawLine(QPointF(gx_last, py + gy_last), QPointF(gx, py + gy))
                             gy_last = gy
                             gx_last = gx
 
@@ -533,9 +527,7 @@ class MainWindow(QMainWindow):
         if self.pin_graphs:
             if self.charts.width < 10:
                 self.charts.width = 200
-                self.splitter.setSizes(
-                    [self.geometry().width() - self.charts.width, self.charts.width]
-                )
+                self.splitter.setSizes([self.geometry().width() - self.charts.width, self.charts.width])
         elif self.charts.width > 100:
             self.charts.width = 0
             self.splitter.setSizes([self.geometry().width(), 0])
@@ -598,6 +590,11 @@ class MainWindow(QMainWindow):
                         self.signals[signal]["targets"].append(name)
                     elif arrow == "==>":
                         self.signals[signal]["source"] = name
+                    elif arrow == "<=>":
+                        if self.signals[signal]["source"]:
+                            self.signals[signal]["targets"].append(name)
+                        else:
+                            self.signals[signal]["source"] = name
                 else:
                     owner, vtype, direction, value, name = line.split()
                     self.pininfo[name] = {
@@ -674,11 +671,7 @@ class MainWindow(QMainWindow):
             source_value = parts.get("source_value")
             source_group = ".".join(source_parts[:-1])
             source_pin = source_parts[-1]
-            if (
-                source_group.startswith("halui.")
-                or "vcp." in source_group
-                or "qtdragon" in source_group
-            ):
+            if source_group.startswith("halui.") or "vcp." in source_group or "qtdragon" in source_group:
                 source_group = ".".join(source_parts[0:1])
                 source_pin = ".".join(source_parts[1:])
 
@@ -693,19 +686,13 @@ class MainWindow(QMainWindow):
             if source_group:
                 if source_group not in groups:
                     groups[source_group] = []
-                groups[source_group].append(
-                    {"pin": source_pin, "value": source_value, "dir": "out"}
-                )
+                groups[source_group].append({"pin": source_pin, "value": source_value})
 
             for target in parts["targets"]:
                 target_parts = target.split(".")
                 target_group = ".".join(target_parts[:-1])
                 target_pin = target_parts[-1]
-                if (
-                    target_group.startswith("halui.")
-                    or "vcp." in target_group
-                    or "qtdragon" in target_group
-                ):
+                if target_group.startswith("halui.") or "vcp." in target_group or "qtdragon" in target_group:
                     target_group = ".".join(target_parts[0:1])
                     target_pin = ".".join(target_parts[1:])
                 target_name = f"{target_group}:{target_pin}"
@@ -715,7 +702,7 @@ class MainWindow(QMainWindow):
 
                 if target_group not in groups:
                     groups[target_group] = []
-                groups[target_group].append({"pin": target_pin, "dir": "in"})
+                groups[target_group].append({"pin": target_pin})
 
                 if not source_group and not source_pin:
                     continue
@@ -737,7 +724,6 @@ class MainWindow(QMainWindow):
             pin_strs = []
             for pin_data in groups[group_name]:
                 port = pin_data["pin"]
-                direction = pin_data["dir"]
                 value = pin_data.get("value")
                 text = f"{port}={value}"
                 pin_str = f'<tr><td bgcolor="{colors["port_bg"]}" port="{port}"><font color="{colors["port_text"]}">{text}=000.000</font></td></tr>'
@@ -802,9 +788,7 @@ class MainWindow(QMainWindow):
                 h = max(h, 40)
                 if title.text in self.nodesetup["positions"]:
                     x1, y1 = self.nodesetup["positions"][title.text]
-                self.nodesdict[title.text] = MyNode(
-                    self, x1, y1, w, h, title.text, pins
-                )
+                self.nodesdict[title.text] = MyNode(self, x1, y1, w, h, title.text, pins)
                 self.scene.addItem(self.nodesdict[title.text])
 
         self.edges = {}
@@ -862,9 +846,7 @@ class MainWindow(QMainWindow):
                 if pinName in self.pin_graph_data:
                     self.pin_graph_data[pinName]["data"] = [
                         pinValue,
-                        *self.pin_graph_data[pinName]["data"][
-                            : self.pin_graph_data[pin]["len"]
-                        ],
+                        *self.pin_graph_data[pinName]["data"][: self.pin_graph_data[pin]["len"]],
                     ]
             except Exception:
                 pass
