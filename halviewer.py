@@ -698,7 +698,7 @@ class MainWindow(QMainWindow):
         self.pininfo = {}
         self.signals = {}
         self.components = {}
-        self.setps = {}
+        self.setps = []
 
         result = subprocess.run(["halcmd", "show"], stdout=subprocess.PIPE, check=False)
         section = ""
@@ -747,8 +747,7 @@ class MainWindow(QMainWindow):
                         "signal": None,
                     }
                     if not name.startswith((self.cfilter)) and not name.endswith(self.pfilter):
-                        # print(name)
-                        self.setps[name] = value
+                        self.setps.append(name)
 
         groups = {}
         for signal_name, parts in self.signals.items():
@@ -813,7 +812,10 @@ class MainWindow(QMainWindow):
                 pin_str = f'<tr><td bgcolor="{colors["port_bg"]}" port="{pin_name}"><font color="{colors["port_text"]}">{pin_name}=000.000</font></td></tr>'
                 pin_strs.append(pin_str)
 
-            for setp_raw, value in self.setps.items():
+            pinlist = self.setps
+            if self.nodesetup["namesort"]:
+                pinlist = sorted(pinlist)
+            for setp_raw in pinlist:
                 if setp_raw.startswith(group_name) and setp_raw not in used:
                     used.append(setp_raw)
                     setp = setp_raw.replace(f"{group_name}.", "")
@@ -863,8 +865,6 @@ class MainWindow(QMainWindow):
                 for text in pintext:
                     pinlist.append(text.text.split("=")[0])
 
-                if self.nodesetup["namesort"]:
-                    pinlist = sorted(pinlist)
                 if self.nodesetup["dirsort"] or len(pintext) < 7:
                     sorting = ("IN", "INOUT", "OUT", None)
                 else:
