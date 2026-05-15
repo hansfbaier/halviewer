@@ -186,7 +186,7 @@ class MyNode(QGraphicsItem):
 
     def paintPort(self, painter, x, y, direction):
         painter.fillRect(QRectF(x - 5, y - 5, 10, 10), Qt.GlobalColor.yellow)
-        if direction == "1":
+        if direction == "IN":
             painter.fillRect(QRectF(x - 4, y - 4, 8, 8), Qt.GlobalColor.black)
         else:
             painter.fillRect(QRectF(x - 4, y - 4, 8, 8), Qt.GlobalColor.gray)
@@ -216,70 +216,74 @@ class MyNode(QGraphicsItem):
         py = self.radius
         for pin_name, pin_data in self.pins.items():
             pin_title = pin_data["pin"]
-            direction = pin_data["dir"]
-            is_setp = pin_data["is_setp"]
-            vtype = pin_data["type"]
             value = pin_data["value"]
-            if vtype == "2":
+            pininfo = pin_data["pininfo"]
+            if not pininfo:
                 painter.setPen(QPen(self.title_color, 1))
                 painter.drawText(
                     QRectF(0, py - 2, self.width, 16),
                     Qt.AlignmentFlag.AlignCenter,
                     f"{pin_title}",
                 )
-            elif is_setp == "1":
-                painter.setPen(QPen(self.info_color, 1))
-                painter.drawText(
-                    QRectF(0, py, self.width, 16),
-                    Qt.AlignmentFlag.AlignCenter,
-                    f"{pin_title}={value}",
-                )
             else:
-                painter.setPen(QPen(self.title_color, 1))
-                self.paintPort(painter, 8, py + 8, direction)
-                self.paintPort(painter, self.width - 8, py + 8, direction)
-                if direction == "1":
-                    painter.drawLine(QPointF(15, py + 8), QPointF(15 + 5, py + 8))
-                    painter.drawLine(
-                        QPointF(15 + 2, py + 8 - 2), QPointF(15 + 5, py + 8)
-                    )
-                    painter.drawLine(
-                        QPointF(15 + 2, py + 8 + 2), QPointF(15 + 5, py + 8)
-                    )
-                    painter.drawLine(
-                        QPointF(self.width - 15, py + 8),
-                        QPointF(self.width - 15 - 5, py + 8),
-                    )
-                    painter.drawLine(
-                        QPointF(self.width - 15 - 2, py + 8 - 2),
-                        QPointF(self.width - 15 - 5, py + 8),
-                    )
-                    painter.drawLine(
-                        QPointF(self.width - 15 - 2, py + 8 + 2),
-                        QPointF(self.width - 15 - 5, py + 8),
+                direction = pininfo["direction"]
+                signal = pininfo["signal"]
+                if signal is None:
+                    painter.setPen(QPen(self.info_color, 1))
+                    painter.drawText(
+                        QRectF(0, py, self.width, 16),
+                        Qt.AlignmentFlag.AlignCenter,
+                        f"{pin_title}={value}",
                     )
                 else:
-                    painter.drawLine(QPointF(15, py + 8), QPointF(15 + 5, py + 8))
-                    painter.drawLine(QPointF(15, py + 8), QPointF(15 + 3, py + 8 - 2))
-                    painter.drawLine(QPointF(15, py + 8), QPointF(15 + 3, py + 8 + 2))
-                    painter.drawLine(
-                        QPointF(self.width - 15, py + 8),
-                        QPointF(self.width - 15 - 5, py + 8),
+                    painter.setPen(QPen(self.title_color, 1))
+                    self.paintPort(painter, 8, py + 8, direction)
+                    self.paintPort(painter, self.width - 8, py + 8, direction)
+                    if direction == "IN":
+                        painter.drawLine(QPointF(15, py + 8), QPointF(15 + 5, py + 8))
+                        painter.drawLine(
+                            QPointF(15 + 2, py + 8 - 2), QPointF(15 + 5, py + 8)
+                        )
+                        painter.drawLine(
+                            QPointF(15 + 2, py + 8 + 2), QPointF(15 + 5, py + 8)
+                        )
+                        painter.drawLine(
+                            QPointF(self.width - 15, py + 8),
+                            QPointF(self.width - 15 - 5, py + 8),
+                        )
+                        painter.drawLine(
+                            QPointF(self.width - 15 - 2, py + 8 - 2),
+                            QPointF(self.width - 15 - 5, py + 8),
+                        )
+                        painter.drawLine(
+                            QPointF(self.width - 15 - 2, py + 8 + 2),
+                            QPointF(self.width - 15 - 5, py + 8),
+                        )
+                    else:
+                        painter.drawLine(QPointF(15, py + 8), QPointF(15 + 5, py + 8))
+                        painter.drawLine(
+                            QPointF(15, py + 8), QPointF(15 + 3, py + 8 - 2)
+                        )
+                        painter.drawLine(
+                            QPointF(15, py + 8), QPointF(15 + 3, py + 8 + 2)
+                        )
+                        painter.drawLine(
+                            QPointF(self.width - 15, py + 8),
+                            QPointF(self.width - 15 - 5, py + 8),
+                        )
+                        painter.drawLine(
+                            QPointF(self.width - 15, py + 8),
+                            QPointF(self.width - 15 - 3, py + 8 - 2),
+                        )
+                        painter.drawLine(
+                            QPointF(self.width - 15, py + 8),
+                            QPointF(self.width - 15 - 3, py + 8 + 2),
+                        )
+                    painter.drawText(
+                        QRectF(0, py, self.width, 16),
+                        Qt.AlignmentFlag.AlignCenter,
+                        f"{pin_title}={value}",
                     )
-                    painter.drawLine(
-                        QPointF(self.width - 15, py + 8),
-                        QPointF(self.width - 15 - 3, py + 8 - 2),
-                    )
-                    painter.drawLine(
-                        QPointF(self.width - 15, py + 8),
-                        QPointF(self.width - 15 - 3, py + 8 + 2),
-                    )
-
-                painter.drawText(
-                    QRectF(0, py, self.width, 16),
-                    Qt.AlignmentFlag.AlignCenter,
-                    f"{pin_title}={value}",
-                )
             py += 16
 
         # border
@@ -425,10 +429,10 @@ class MainWindow(QMainWindow):
         self.gAll.attr(ranksep="2.5")
         self.gAll.attr(rankdir="LR")
 
+        self.pininfo = {}
         self.signals = {}
         self.components = {}
         self.setps = {}
-        self.setss = {}
 
         result = subprocess.run(["halcmd", "show"], stdout=subprocess.PIPE, check=False)
         section = ""
@@ -442,6 +446,15 @@ class MainWindow(QMainWindow):
             elif section == "pins" and line.split()[0].isnumeric():
                 if "=" in line:
                     owner, vtype, direction, value, name, arrow, signal = line.split()
+                    self.pininfo[name] = {
+                        "owner": owner,
+                        "vtype": vtype,
+                        "direction": direction,
+                        "value": value,
+                        "name": name,
+                        "arrow": arrow,
+                        "signal": signal,
+                    }
                     if signal not in self.signals:
                         self.signals[signal] = {
                             "source": "",
@@ -453,6 +466,15 @@ class MainWindow(QMainWindow):
                         self.signals[signal]["source"] = name
                 else:
                     owner, vtype, direction, value, name = line.split()
+                    self.pininfo[name] = {
+                        "owner": owner,
+                        "vtype": vtype,
+                        "direction": direction,
+                        "value": value,
+                        "name": name,
+                        "arrow": None,
+                        "signal": None,
+                    }
                     cfilter = (
                         "halui.",
                         "joint.",
@@ -584,22 +606,18 @@ class MainWindow(QMainWindow):
                 direction = pin_data["dir"]
                 value = pin_data.get("value")
                 text = f"{port}={value}"
-                ccode = "#000000"
-                if direction == "in":
-                    ccode = "#010000"
-                pin_str = f'<tr><td bgcolor="{colors["port_bg"]}" port="{port}"><font color="{ccode}">{text}=000.000</font></td></tr>'
+                pin_str = f'<tr><td bgcolor="{colors["port_bg"]}" port="{port}"><font color="{colors["port_text"]}">{text}=000.000</font></td></tr>'
                 pin_strs.append(pin_str)
 
             for setp_raw, value in self.setps.items():
                 if setp_raw.startswith(group_name) and setp_raw not in used:
                     used.append(setp_raw)
                     setp = setp_raw.replace(f"{group_name}.", "")
-                    ccode = "#000100"
-                    pin_str = f'<tr><td bgcolor="{colors["setp_bg"]}" port="{setp}"><font color="{ccode}">{setp}=000.000</font></td></tr>'
+                    pin_str = f'<tr><td bgcolor="{colors["setp_bg"]}" port="{setp}"><font color="{colors["setp_text"]}">{setp}=000.000</font></td></tr>'
                     pin_strs.append(pin_str)
 
             title = group_name.replace("\\n", "<br/>")
-            label = f'<<table border="0" cellborder="1" cellspacing="0"><tr><td bgcolor="{colors["header_bg"]}"><font color="#000002">{title}</font></td></tr>{"".join(pin_strs)}</table>>'
+            label = f'<<table border="0" cellborder="1" cellspacing="0"><tr><td bgcolor="{colors["header_bg"]}"><font color="{colors["header_text"]}">{title}</font></td></tr>{"".join(pin_strs)}</table>>'
             self.gAll.node(
                 group_name,
                 shape="plaintext",
@@ -632,20 +650,12 @@ class MainWindow(QMainWindow):
 
                 pins = {}
                 for text in node.findall(".//{http://www.w3.org/2000/svg}text"):
-                    info = text.attrib["fill"]
-                    # color coded additional infos
-                    direction = info[2]
-                    is_setp = info[4]
-                    vtype = info[6]
-                    # print(direction, setp, vtype)
                     pin_name = text.text.split("=")[0]
                     pdict = {
                         "node": title.text,
                         "pin": pin_name,
-                        "dir": direction,
-                        "is_setp": is_setp,
-                        "type": vtype,
                         "value": None,
+                        "pininfo": self.pininfo.get(f"{title.text}.{pin_name}", {}),
                     }
                     pins[pin_name] = pdict
                     if title.text != pin_name:
@@ -700,8 +710,6 @@ class MainWindow(QMainWindow):
             if pinName in self.pinsdict:
                 node_name = self.pinsdict[pinName]["node"]
                 pin_name = self.pinsdict[pinName]["pin"]
-                # direction = self.pinsdict[pinName]["dir"]
-                # is_setp = self.pinsdict[pinName]["is_setp"]
                 node = self.nodesdict[node_name]
                 if node.pins[pin_name]["value"] != pinValue:
                     node.pins[pin_name]["value"] = pinValue
