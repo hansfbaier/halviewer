@@ -753,7 +753,6 @@ class MainWindow(QMainWindow):
         groups = {}
         for signal_name, parts in self.signals.items():
             source_parts = parts["source"].split(".")
-            source_value = parts.get("source_value")
             source_group = ".".join(source_parts[:-1])
             source_pin = source_parts[-1]
             if source_group.startswith(tuple(self.nodesetup["grouping"])):
@@ -771,7 +770,7 @@ class MainWindow(QMainWindow):
             if source_group:
                 if source_group not in groups:
                     groups[source_group] = []
-                groups[source_group].append({"pin": source_pin, "value": source_value})
+                groups[source_group].append(source_pin)
 
             for target in parts["targets"]:
                 target_parts = target.split(".")
@@ -787,7 +786,7 @@ class MainWindow(QMainWindow):
 
                 if target_group not in groups:
                     groups[target_group] = []
-                groups[target_group].append({"pin": target_pin})
+                groups[target_group].append(target_pin)
 
                 if not source_group and not source_pin:
                     continue
@@ -807,11 +806,11 @@ class MainWindow(QMainWindow):
         used = []
         for group_name in sorted(groups, reverse=True):
             pin_strs = []
-            for pin_data in groups[group_name]:
-                port = pin_data["pin"]
-                value = pin_data.get("value")
-                text = f"{port}={value}"
-                pin_str = f'<tr><td bgcolor="{colors["port_bg"]}" port="{port}"><font color="{colors["port_text"]}">{text}=000.000</font></td></tr>'
+            pinlist = groups[group_name]
+            if self.nodesetup["namesort"]:
+                pinlist = sorted(pinlist)
+            for pin_name in pinlist:
+                pin_str = f'<tr><td bgcolor="{colors["port_bg"]}" port="{pin_name}"><font color="{colors["port_text"]}">{pin_name}=000.000</font></td></tr>'
                 pin_strs.append(pin_str)
 
             for setp_raw, value in self.setps.items():
