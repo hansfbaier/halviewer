@@ -2,6 +2,8 @@
 #
 #
 
+import os
+import json
 import argparse
 import subprocess
 import sys
@@ -12,12 +14,11 @@ import graphviz
 import hal
 
 parser = argparse.ArgumentParser()
+parser.add_argument("--interval", "-i", help="update interval", type=int, default=100)
 parser.add_argument(
-    "--interval", "-i", help="update interval", nargs="?", type=int, default=100
+    "--buffer", "-b", help="linechart buffer size", type=int, default=50
 )
-parser.add_argument(
-    "--buffer", "-b", help="linechart buffer size", nargs="?", type=int, default=50
-)
+parser.add_argument("--setup", "-s", help="setup file", type=str, default="")
 parser.add_argument(
     "--qt5", "-5", help="using pyqt5", default=False, action="store_true"
 )
@@ -304,6 +305,9 @@ class MyNode(QGraphicsItem):
             QGraphicsItem.mousePressEvent(self, event)
 
     def mouseReleaseEvent(self, event):
+        pos = self.pos()
+        self.parent.nodesetup["positions"][self.title] = (pos.x(), pos.y())
+        self.parent.writeSetup()
         QGraphicsItem.mouseReleaseEvent(self, event)
 
     def mouseDoubleClickEvent(self, event):
@@ -460,10 +464,18 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("LinuxCNC - HalViewer")
-        self.resize(1200, 900)
 
+        self.nodesetup = {}
+        if args.setup and os.path.isfile(args.setup):
+            self.nodesetup = json.loads(open(args.setup, "r").read())
+        if "linecharts" not in self.nodesetup:
+            self.nodesetup["linecharts"] = []
+        if "positions" not in self.nodesetup:
+            self.nodesetup["positions"] = {}
+
+        self.resize(1200, 900)
         self.pin_graph_data = {}
-        self.pin_graphs = []
+        self.pin_graphs = self.nodesetup["linecharts"]
         self.run = True
         self.scene = NodeScene(-7000, -7000, 12000, 12000, self)
         self.view = NodeViewer(self.scene)
@@ -508,6 +520,7 @@ class MainWindow(QMainWindow):
         self.main.setLayout(vboxMain)
 
         self.readGraph()
+        self.check_splitter()
         self.show()
         self.fit_view()
 
@@ -516,12 +529,7 @@ class MainWindow(QMainWindow):
         self.timer.timeout.connect(self.runTimer)
         self.timer.start(args.interval)
 
-    def toggle_pin_graph(self, pin):
-        if pin in self.pin_graphs:
-            self.pin_graphs.remove(pin)
-        else:
-            self.pin_graphs.append(pin)
-
+    def check_splitter(self):
         if self.pin_graphs:
             if self.charts.width < 10:
                 self.charts.width = 200
@@ -531,6 +539,13 @@ class MainWindow(QMainWindow):
         elif self.charts.width > 100:
             self.charts.width = 0
             self.splitter.setSizes([self.geometry().width(), 0])
+
+    def toggle_pin_graph(self, pin):
+        if pin in self.pin_graphs:
+            self.pin_graphs.remove(pin)
+        else:
+            self.pin_graphs.append(pin)
+        self.check_splitter()
 
     def export(self):
         colors = {
@@ -750,6 +765,7 @@ class MainWindow(QMainWindow):
     def readGraph(self):
         self.pinsdict = {}
         self.nodesdict = {}
+
         nodes = self.root.findall(".//*[@class='node']")
         for node in nodes:
             title = node.find(".//{http://www.w3.org/2000/svg}title")
@@ -784,6 +800,8 @@ class MainWindow(QMainWindow):
                 h = abs(y2 - y1)
                 w = max(w, 70)
                 h = max(h, 40)
+                if title.text in self.nodesetup["positions"]:
+                    x1, y1 = self.nodesetup["positions"][title.text]
                 self.nodesdict[title.text] = MyNode(
                     self, x1, y1, w, h, title.text, pins
                 )
@@ -809,6 +827,11 @@ class MainWindow(QMainWindow):
                 if pin not in self.edges:
                     self.edges[pin] = []
                 self.edges[pin].append(edge)
+        self.writeSetup()
+
+    def writeSetup(self):
+        if args.setup:
+            open(args.setup, "w").write(json.dumps(self.nodesetup, indent=4))
 
     def runTimer(self):
         if not self.run:
