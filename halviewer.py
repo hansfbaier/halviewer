@@ -379,7 +379,7 @@ class NodeViewer(QGraphicsView):
         super().mouseMoveEvent(event)
 
 
-class PinGraph(QWidget):
+class LineCharts(QWidget):
     def __init__(self, data):
         super().__init__()
         self.data = data
@@ -405,9 +405,19 @@ class PinGraph(QWidget):
             py = 10
             for pin, data in self.data.items():
                 painter.setPen(QPen(Qt.GlobalColor.black, 1))
-                painter.drawText(QRectF(5, py, gw, 18), Qt.AlignmentFlag.AlignLeft, pin)
-                py += 18
-                if data["data"]:
+                if not data["data"]:
+                    painter.drawText(
+                        QRectF(5, py, gw, 18), Qt.AlignmentFlag.AlignLeft, pin
+                    )
+                    py += 20
+                else:
+                    painter.drawText(
+                        QRectF(5, py, gw, 18),
+                        Qt.AlignmentFlag.AlignLeft,
+                        f"{pin}: {data['data'][0]}",
+                    )
+                    py += 20
+
                     if data["min"] is None:
                         data["min"] = float(data["data"][0])
                         data["max"] = float(data["data"][0])
@@ -454,7 +464,7 @@ class MainWindow(QMainWindow):
         self.run = True
         self.scene = NodeScene(-7000, -7000, 12000, 12000, self)
         self.view = NodeViewer(self.scene)
-        self.graphs = PinGraph(self.pin_graph_data)
+        self.charts = LineCharts(self.pin_graph_data)
 
         svg_data = self.export()
         self.root = ET.fromstring(svg_data)
@@ -482,12 +492,12 @@ class MainWindow(QMainWindow):
         linecharts.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         linecharts.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         linecharts.setWidgetResizable(True)
-        linecharts.setWidget(self.graphs)
+        linecharts.setWidget(self.charts)
 
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.splitter.addWidget(self.view)
         self.splitter.addWidget(linecharts)
-        self.splitter.setSizes([self.geometry().width() - self.graphs.width, 0])
+        self.splitter.setSizes([self.geometry().width() - self.charts.width, 0])
         vboxMain.addWidget(self.splitter)
 
         self.main = QWidget()
@@ -510,13 +520,13 @@ class MainWindow(QMainWindow):
             self.pin_graphs.append(pin)
 
         if self.pin_graphs:
-            if self.graphs.width < 10:
-                self.graphs.width = 200
+            if self.charts.width < 10:
+                self.charts.width = 200
                 self.splitter.setSizes(
-                    [self.geometry().width() - self.graphs.width, self.graphs.width]
+                    [self.geometry().width() - self.charts.width, self.charts.width]
                 )
-        elif self.graphs.width > 100:
-            self.graphs.width = 0
+        elif self.charts.width > 100:
+            self.charts.width = 0
             self.splitter.setSizes([self.geometry().width(), 0])
 
     def export(self):
@@ -858,7 +868,7 @@ class MainWindow(QMainWindow):
             node.update()
 
         if self.pin_graph_data:
-            self.graphs.update()
+            self.charts.update()
 
     def freeze(self):
         self.run = 1 - self.run
