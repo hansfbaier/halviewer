@@ -96,7 +96,7 @@ class NodeEdge(QGraphicsPathItem):
         self.style = Qt.PenStyle.SolidLine
         self._pen_default = QPen(self.color)
         self._pen_default.setWidthF(2)
-        self.setZValue(5)
+        # self.setZValue(-1)
         self.setFlags(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
         self.setAcceptHoverEvents(True)
         self.update_edge_path()
@@ -117,23 +117,15 @@ class NodeEdge(QGraphicsPathItem):
             return
         pos1 = self._source_node.port_pos(self._source_port, self._target_node)
         pos2 = self._target_node.port_pos(self._target_port, self._source_node)
-        if pos1.x() > pos2.x():
-            pos2 = self._source_node.port_pos(self._source_port, self._target_node)
-            pos1 = self._target_node.port_pos(self._target_port, self._source_node)
-
+        distance = (pos2.x() - pos1.x()) / 2
+        control_x_start = distance
+        control_x_end = -distance
         path = QPainterPath(pos1)
-
-        ctr_offset_y1, ctr_offset_y2 = pos1.y(), pos2.y()
-        tangent = abs(ctr_offset_y1 - ctr_offset_y2)
-
-        max_height = 2
-        tangent = min(tangent, max_height)
-        ctr_offset_y1 -= tangent
-        ctr_offset_y2 += tangent
-
-        ctr_point1 = QPointF(pos1.x(), ctr_offset_y1)
-        ctr_point2 = QPointF(pos2.x(), ctr_offset_y2)
-        path.cubicTo(ctr_point1, ctr_point2, pos2)
+        path.cubicTo(
+            QPointF(pos1.x() + control_x_start, pos1.y()),
+            QPointF(pos2.x() + control_x_end, pos2.y()),
+            pos2,
+        )
         self.setPath(path)
 
     def hoverEnterEvent(self, event):
@@ -151,7 +143,7 @@ class MyNode(QGraphicsItem):
     border_size = 4
     border_color = QColor(150, 150, 150)
     border_color_selected = QColor(250, 250, 250)
-    border_color_hover = QColor(250, 150, 150)
+    border_color_hover = QColor(200, 200, 200)
     bg_color = QColor(100, 100, 100)
     title_size = 9
     info_size = 7
@@ -207,20 +199,21 @@ class MyNode(QGraphicsItem):
 
     def paintArrow(self, painter, x, y, direction):
         if direction == "LEFT":
-            painter.drawLine(QPointF(x - 3, y), QPointF(x + 3, y))
-            painter.drawLine(QPointF(x - 3, y), QPointF(x + 1, y - 2))
-            painter.drawLine(QPointF(x - 3, y), QPointF(x + 1, y + 2))
+            path = QPainterPath()
+            path.moveTo(QPointF(x - 5, y))
+            path.lineTo(QPointF(x + 5, y + 5))
+            path.lineTo(QPointF(x + 5, y - 5))
+            path.lineTo(QPointF(x - 5, y))
         else:
-            painter.drawLine(QPointF(x - 3, y), QPointF(x + 3, y))
-            painter.drawLine(QPointF(x - 1, y - 2), QPointF(x + 3, y))
-            painter.drawLine(QPointF(x - 1, y + 2), QPointF(x + 3, y))
-
-    def paintPort(self, painter, x, y, direction):
-        painter.fillRect(QRectF(x - 5, y - 5, 10, 10), Qt.GlobalColor.yellow)
-        if direction == "IN":
-            painter.fillRect(QRectF(x - 4, y - 4, 8, 8), Qt.GlobalColor.black)
-        else:
-            painter.fillRect(QRectF(x - 4, y - 4, 8, 8), Qt.GlobalColor.gray)
+            path = QPainterPath()
+            path.moveTo(QPointF(x + 5, y))
+            path.lineTo(QPointF(x - 5, y + 5))
+            path.lineTo(QPointF(x - 5, y - 5))
+            path.lineTo(QPointF(x + 5, y))
+        painter.setPen(QPen(Qt.GlobalColor.black, 1))
+        painter.setBrush(QBrush(Qt.GlobalColor.yellow))
+        painter.fillPath(path, painter.brush())
+        painter.drawPath(path)
 
     def paint(self, painter, option, widget):
         if self.hover:
@@ -229,6 +222,13 @@ class MyNode(QGraphicsItem):
             pen = QPen(self.border_color_selected, self.border_size)
         else:
             pen = QPen(self.border_color, self.border_size)
+
+        # title
+        rect = self.boundingRect()
+        rect = QRectF(0, 0, self.width, self.radius + 16)
+        title_path = QPainterPath()
+        title_path.addRoundedRect(rect, self.radius, self.radius)
+        painter.setClipPath(title_path)
 
         # path
         rect = self.boundingRect()
@@ -241,6 +241,15 @@ class MyNode(QGraphicsItem):
         painter.setBrush(brush)
         painter.fillPath(path, painter.brush())
 
+        # title background
+        brush = QBrush(QColor(150, 150, 200))
+        painter.setBrush(brush)
+        painter.fillPath(title_path, painter.brush())
+
+        # border
+        painter.setPen(pen)
+        painter.strokePath(path, painter.pen())
+
         # pin text
         painter.setPen(QPen(self.title_color, 1))
         painter.setFont(QFont(self.text_font, self.title_size))
@@ -252,7 +261,7 @@ class MyNode(QGraphicsItem):
             if not pininfo:
                 painter.setPen(QPen(self.title_color, 1))
                 painter.drawText(
-                    QRectF(0, py - 2, self.width, 16),
+                    QRectF(0, py - 3, self.width, 16),
                     Qt.AlignmentFlag.AlignCenter,
                     f"{pin_title}",
                 )
@@ -267,26 +276,20 @@ class MyNode(QGraphicsItem):
                         f"{pin_title}={value}",
                     )
                 else:
-                    painter.setPen(QPen(self.title_color, 1))
-                    self.paintPort(painter, 8, py + 8, direction)
-                    self.paintPort(painter, self.width - 8, py + 8, direction)
                     if direction == "IN":
-                        self.paintArrow(painter, 18, py + 8, "RIGHT")
-                        self.paintArrow(painter, self.width - 18, py + 8, "LEFT")
+                        self.paintArrow(painter, 8, py + 8, "RIGHT")
+                        self.paintArrow(painter, self.width - 8, py + 8, "LEFT")
                     else:
-                        self.paintArrow(painter, 18, py + 8, "LEFT")
-                        self.paintArrow(painter, self.width - 18, py + 8, "RIGHT")
+                        self.paintArrow(painter, 8, py + 8, "LEFT")
+                        self.paintArrow(painter, self.width - 8, py + 8, "RIGHT")
 
+                    painter.setPen(QPen(self.title_color, 1))
                     painter.drawText(
                         QRectF(0, py, self.width, 16),
                         Qt.AlignmentFlag.AlignCenter,
                         f"{pin_title}={value}",
                     )
             py += 16
-
-        # border
-        painter.setPen(pen)
-        painter.strokePath(path, painter.pen())
 
     def hoverEnterEvent(self, event):
         self.hover = True
