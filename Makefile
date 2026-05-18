@@ -9,3 +9,6 @@ check:
 
 check_fix:
 	ruff check --fix halviewer.py
+
+install:
+	sudo install halviewer.py /usr/local/bin/halviewer
