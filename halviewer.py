@@ -270,6 +270,9 @@ class CompNode(QGraphicsItem):
             pin_title = pin_data["pin"]
             value = pin_data["value"]
             pininfo = pin_data["pininfo"]
+            if not pininfo:
+                print(f"ERROR: name: {pin_name} pininfo: {pininfo}")
+                continue
             direction = pininfo["direction"]
             signal = pininfo["signal"]
             if signal is None:
@@ -417,6 +420,7 @@ class LineCharts(QWidget):
         if idx < len(self.parent.nodesetup["linecharts"]):
             self.parent.nodesetup["linecharts"].pop(idx)
         self.parent.writeSetup()
+        self.parent.check_splitter()
 
     def paintEvent(self, event):
         if self.width < 10:
@@ -816,7 +820,7 @@ class MainWindow(QMainWindow):
             if self.nodesetup["namesort"]:
                 pinlist = sorted(pinlist)
             for setp_raw in pinlist:
-                if setp_raw.startswith(group_name) and setp_raw not in used:
+                if setp_raw.startswith(f"{group_name}.") and setp_raw not in used:
                     used.append(setp_raw)
                     setp = setp_raw.replace(f"{group_name}.", "")
                     pin_str = f'<tr><td bgcolor="{colors["setp_bg"]}" port="{setp}"><font color="{colors["setp_text"]}">{setp}=000.000</font></td></tr>'
