@@ -566,6 +566,8 @@ class MainWindow(QMainWindow):
             self.nodesetup["namesort"] = True
         if "dirsort" not in self.nodesetup:
             self.nodesetup["dirsort"] = False
+        if "filter" not in self.nodesetup:
+            self.nodesetup["filter"] = True
 
         self.pin_graph_data = {}
         self.run = True
@@ -581,11 +583,12 @@ class MainWindow(QMainWindow):
             exit(0)
 
         self.h = hal.component(f"halview-{uuid.uuid4()}")
+        self.h.ready()
 
         hboxButtons = QHBoxLayout()
         hboxBoxes = QHBoxLayout()
 
-        for tval in ("unconnected", "namesort", "dirsort"):
+        for tval in ("unconnected", "namesort", "dirsort", "filter"):
             checkbox = QCheckBox(tval.title())
             checkbox.setChecked(self.nodesetup[tval])
             checkbox.stateChanged.connect(partial(self.toggle, tval))
@@ -750,31 +753,28 @@ class MainWindow(QMainWindow):
                         "arrow": None,
                         "signal": None,
                     }
-                    if not name.startswith((self.cfilter)) and not name.endswith(self.pfilter):
+                    if not self.nodesetup["filter"] or (not name.startswith((self.cfilter)) and not name.endswith(self.pfilter)):
                         self.setps.append(name)
 
         groups = {}
+        basenames = set()
         for signal_name, parts in self.signals.items():
             source_parts = parts["source"].split(".")
-            source_group = ".".join(source_parts[:-1])
+            source_group = ".".join(source_parts[0:-1])
             source_pin = source_parts[-1]
             if source_group.startswith(tuple(self.nodesetup["grouping"])):
                 source_group = ".".join(source_parts[0:1])
                 source_pin = ".".join(source_parts[1:])
-
             if not source_group:
                 source_group = source_pin
-
+            basenames.add(source_parts[0])
             source = f"{source_group}:{source_pin}"
-
             if not source_group:
                 source_group = source_parts[0]
-
             if source_group:
                 if source_group not in groups:
                     groups[source_group] = []
                 groups[source_group].append(source_pin)
-
             for target in parts["targets"]:
                 target_parts = target.split(".")
                 target_group = ".".join(target_parts[:-1])
@@ -783,21 +783,18 @@ class MainWindow(QMainWindow):
                     target_group = ".".join(target_parts[0:1])
                     target_pin = ".".join(target_parts[1:])
                 target_name = f"{target_group}:{target_pin}"
-
                 if not target_group:
                     target_group = target_parts[0]
-
                 if target_group not in groups:
                     groups[target_group] = []
                 groups[target_group].append(target_pin)
-
                 if not source_group and not source_pin:
                     continue
                 if not target_name:
                     continue
-
                 source_name = source.split("=")[0]
                 eid = source_name.replace(":", ".")
+
                 self.gAll.edge(
                     source_name,
                     target_name,
@@ -805,6 +802,21 @@ class MainWindow(QMainWindow):
                     penwidth="2",
                     color=colors["edge"],
                 )
+
+        """
+        for name in self.pininfo:
+            base = name.split(".")[0]
+            if base in groups or base in basenames:
+                continue
+            source_parts = name.split(".")
+            source_group = ".".join(source_parts[:-1])
+            source_pin = source_parts[-1]
+            if source_group.startswith(tuple(self.nodesetup["grouping"])):
+                source_group = ".".join(source_parts[0:1])
+            if source_group:
+                if source_group not in groups:
+                    groups[source_group] = []
+        """
 
         used = []
         for group_name in sorted(groups, reverse=True):
