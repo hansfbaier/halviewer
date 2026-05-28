@@ -45,6 +45,7 @@ if qtversion == "5":
         QGraphicsScene,
         QGraphicsView,
         QHBoxLayout,
+        QLineEdit,
         QMainWindow,
         QPushButton,
         QScrollArea,
@@ -481,6 +482,7 @@ class LineCharts(QWidget):
 
 
 class MainWindow(QMainWindow):
+    search_str = ""
     default_grouping = ["halui.", "pyvcp.", "qtpyvcp.", "gladevcp.", "qtdragon.", "flexhal.", "rio-gui."]
     grouping = []
     cfilter = (
@@ -568,6 +570,8 @@ class MainWindow(QMainWindow):
             self.nodesetup["dirsort"] = False
         if "filter" not in self.nodesetup:
             self.nodesetup["filter"] = True
+        if "search" not in self.nodesetup:
+            self.nodesetup["search"] = ""
 
         self.pin_graph_data = {}
         self.run = True
@@ -593,6 +597,11 @@ class MainWindow(QMainWindow):
             checkbox.setChecked(self.nodesetup[tval])
             checkbox.stateChanged.connect(partial(self.toggle, tval))
             hboxBoxes.addWidget(checkbox, stretch=0)
+
+        search = QLineEdit()
+        search.setText(self.nodesetup["search"])
+        search.textChanged.connect(self.search)
+        hboxBoxes.addWidget(search, stretch=0)
 
         button_reset_grouping = QPushButton("Reset grouping")
         button_reset_grouping.clicked.connect(self.reset_grouping)
@@ -643,6 +652,11 @@ class MainWindow(QMainWindow):
 
     def toggle(self, name, value):
         self.nodesetup[name] = bool(value)
+        self.reload()
+        self.fit_view()
+
+    def search(self, search):
+        self.nodesetup["search"] = search
         self.reload()
         self.fit_view()
 
@@ -719,6 +733,14 @@ class MainWindow(QMainWindow):
             elif section == "pins" and line.split()[0].isnumeric():
                 if "=" in line:
                     owner, vtype, direction, value, name, arrow, signal = line.split()
+                    if self.nodesetup["search"]:
+                        match = False
+                        for part in self.nodesetup["search"].split(","):
+                            if part.strip() and (part in name or part in signal):
+                                match = True
+                        if not match:
+                            continue
+
                     self.pininfo[name] = {
                         "owner": owner,
                         "vtype": vtype,
@@ -744,6 +766,14 @@ class MainWindow(QMainWindow):
                             self.signals[signal]["source"] = name
                 elif self.nodesetup["unconnected"]:
                     owner, vtype, direction, value, name = line.split()
+                    if self.nodesetup["search"]:
+                        match = False
+                        for part in self.nodesetup["search"].split(","):
+                            if part.strip() and part in name:
+                                match = True
+                        if not match:
+                            continue
+
                     self.pininfo[name] = {
                         "owner": owner,
                         "vtype": vtype,
@@ -863,6 +893,8 @@ class MainWindow(QMainWindow):
             title = node.find(".//{http://www.w3.org/2000/svg}title")
             if title is not None:
                 polygon = node.find(".//{http://www.w3.org/2000/svg}polygon")
+                if polygon is None:
+                    continue
                 x1 = float(polygon.attrib["points"].split()[0].split(",")[0])
                 y1 = float(polygon.attrib["points"].split()[0].split(",")[1])
                 x2 = float(polygon.attrib["points"].split()[2].split(",")[0])
@@ -921,6 +953,8 @@ class MainWindow(QMainWindow):
                 begin, end = title.text.split("->")
                 begin_node, begin_pin = begin.split(":")
                 end_node, end_pin = end.split(":")
+                if end_node not in self.nodesdict or begin_node not in self.nodesdict:
+                    continue
                 edgenode = NodeEdge(
                     self,
                     self.nodesdict[begin_node],
