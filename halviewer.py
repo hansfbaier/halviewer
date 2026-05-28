@@ -754,7 +754,9 @@ class MainWindow(QMainWindow):
                         self.signals[signal] = {
                             "source": "",
                             "targets": [],
+                            "pins": [],
                         }
+                    self.signals[signal]["pins"].append(name)
                     if arrow == "<==":
                         self.signals[signal]["targets"].append(name)
                     elif arrow == "==>":
@@ -805,7 +807,7 @@ class MainWindow(QMainWindow):
                 if source_group not in groups:
                     groups[source_group] = []
                 groups[source_group].append(source_pin)
-            for target in parts["targets"]:
+            for target in parts["pins"]:
                 target_parts = target.split(".")
                 target_group = ".".join(target_parts[:-1])
                 target_pin = target_parts[-1]
@@ -818,10 +820,10 @@ class MainWindow(QMainWindow):
                 if target_group not in groups:
                     groups[target_group] = []
                 groups[target_group].append(target_pin)
-                if not source_group and not source_pin:
-                    continue
-                if not target_name:
-                    continue
+                # if not source_group and not source_pin:
+                #    continue
+                # if not target_name:
+                #    continue
                 source_name = source.split("=")[0]
                 eid = source_name.replace(":", ".")
 
@@ -914,7 +916,7 @@ class MainWindow(QMainWindow):
                     pinlist.append(text.text.split("=")[0])
 
                 if self.nodesetup["dirsort"] or len(pintext) < 7:
-                    sorting = ("IN", "INOUT", "OUT", None)
+                    sorting = ("IN", "I/O", "OUT", None)
                 else:
                     sorting = ("OFF",)
                 for skey in sorting:
@@ -951,6 +953,8 @@ class MainWindow(QMainWindow):
             title = edge.find(".//{http://www.w3.org/2000/svg}title")
             if title is not None:
                 begin, end = title.text.split("->")
+                if ":" not in begin:
+                    continue
                 begin_node, begin_pin = begin.split(":")
                 end_node, end_pin = end.split(":")
                 if end_node not in self.nodesdict or begin_node not in self.nodesdict:
