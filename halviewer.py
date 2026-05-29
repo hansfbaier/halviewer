@@ -143,6 +143,9 @@ class NodeEdge(QGraphicsPathItem):
         self.hover = False
         self.update()
 
+    def mouseDoubleClickEvent(self, event):
+        self.parent.port_disconnect((self._source_node, self._source_port), (self._target_node, self._target_port))
+
 
 class CompNode(QGraphicsItem):
     name = ""
@@ -159,6 +162,8 @@ class CompNode(QGraphicsItem):
     title_color = QColor(255, 255, 255)
     info_color = QColor(200, 200, 200)
     action_color = QColor(225, 225, 225)
+    port_selected_color = QColor(225, 0, 0)
+    port_marked_color = QColor(0, 255, 0)
     port_size = 10
     port_border = 2
     port_top = 40
@@ -279,6 +284,7 @@ class CompNode(QGraphicsItem):
             pin_title = pin_data["pin"]
             value = pin_data["value"]
             pininfo = pin_data["pininfo"]
+            marked = pin_data["marked"]
             if not pininfo:
                 print(f"ERROR: name: {pin_name} pininfo: {pininfo}")
                 continue
@@ -290,6 +296,10 @@ class CompNode(QGraphicsItem):
                 if not signal and direction == "IN":
                     title = f">{pin_title}={value}<"
                     painter.setPen(QPen(self.action_color, 1))
+                if self.parent.port_source and self.parent.port_source == (self, pin_name):
+                    painter.setPen(QPen(self.port_selected_color, 1))
+                elif marked:
+                    painter.setPen(QPen(self.port_marked_color, 1))
                 painter.drawText(
                     QRectF(0, py, self.width, 16),
                     Qt.AlignmentFlag.AlignCenter,
@@ -306,7 +316,12 @@ class CompNode(QGraphicsItem):
                     self.paintArrow(painter, 8, py + 8, "BOTH")
                     self.paintArrow(painter, self.width - 8, py + 8, "BOTH")
 
-                painter.setPen(QPen(self.title_color, 1))
+                if self.parent.port_source and self.parent.port_source == (self, pin_name):
+                    painter.setPen(QPen(self.port_selected_color, 1))
+                elif marked:
+                    painter.setPen(QPen(self.port_marked_color, 1))
+                else:
+                    painter.setPen(QPen(self.title_color, 1))
                 painter.drawText(
                     QRectF(0, py, self.width, 16),
                     Qt.AlignmentFlag.AlignCenter,
@@ -324,7 +339,11 @@ class CompNode(QGraphicsItem):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            QGraphicsItem.mousePressEvent(self, event)
+            port = self.port_selected(event.pos())
+            if port:
+                self.parent.port_select((self, port))
+            else:
+                QGraphicsItem.mousePressEvent(self, event)
 
     def mouseReleaseEvent(self, event):
         pos = self.pos()
@@ -346,6 +365,8 @@ class CompNode(QGraphicsItem):
                     vtype = pininfo["vtype"]
                     pinname = f"{self.title}.{port}"
                     if not signal and direction == "IN":
+                        if not self.parent.nodesetup["editable"]:
+                            return
                         # change value
                         value = hal.get_value(pinname)
                         if vtype == "bit":
@@ -595,7 +616,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("LinuxCNC - HalViewer")
-
+        self.port_source = None
         self.nodesetup = {}
         if not args.setup:
             result = subprocess.run(["halreport"], stdout=subprocess.PIPE, check=False)
@@ -620,6 +641,8 @@ class MainWindow(QMainWindow):
             self.nodesetup["filter"] = True
         if "search" not in self.nodesetup:
             self.nodesetup["search"] = ""
+        if "editable" not in self.nodesetup:
+            self.nodesetup["editable"] = False
 
         self.pin_graph_data = {}
         self.run = True
@@ -640,7 +663,7 @@ class MainWindow(QMainWindow):
         hboxButtons = QHBoxLayout()
         hboxBoxes = QHBoxLayout()
 
-        for tval in ("unconnected", "namesort", "dirsort", "filter"):
+        for tval in ("unconnected", "namesort", "dirsort", "filter", "editable"):
             checkbox = QCheckBox(tval.title())
             checkbox.setChecked(self.nodesetup[tval])
             checkbox.stateChanged.connect(partial(self.toggle, tval))
@@ -685,6 +708,13 @@ class MainWindow(QMainWindow):
         hboxBoxes.addStretch()
         vboxMain.addLayout(hboxBoxes)
 
+        hboxCmd = QHBoxLayout()
+        self.cmd = QLineEdit()
+        self.cmd.returnPressed.connect(self.halcmd)
+        hboxCmd.addWidget(QLabel("Hall-Command:"), stretch=0)
+        hboxCmd.addWidget(self.cmd, stretch=1)
+        vboxMain.addLayout(hboxCmd)
+
         self.main = QWidget()
         self.setCentralWidget(self.main)
         self.main.setLayout(vboxMain)
@@ -698,10 +728,110 @@ class MainWindow(QMainWindow):
         self.timer.timeout.connect(self.runTimer)
         self.timer.start(args.interval)
 
+    def port_select(self, port):
+        if not self.nodesetup["editable"]:
+            return
+        if self.port_source == port:
+            self.port_source = None
+            port[0].update()
+        elif self.port_source:
+            self.port_connect(port)
+        else:
+            source_pin_data = port[0].pins[port[1]]
+            source_pininfo = source_pin_data["pininfo"]
+            source_name = source_pininfo["name"]
+            source_signal = source_pininfo["signal"]
+            source_direction = source_pininfo["direction"]
+            source_vtype = source_pininfo["vtype"]
+            if self.port_source:
+                self.port_source[0].update()
+            print("port_select", source_direction)
+            if source_direction in ("OUT", "I/O"):
+                self.port_source = port
+                if not source_signal:
+                    source_signal = "sig_" + source_name.replace(".", "_")
+                self.cmd.setText(f"net {source_signal} {source_name} => ")
+
+                for item in self.scene.items():
+                    if isinstance(item, CompNode):
+                        for pin_name, pin_data in item.pins.items():
+                            pininfo = pin_data["pininfo"]
+                            signal = pininfo["signal"]
+                            direction = pininfo["direction"]
+                            vtype = pininfo["vtype"]
+                            if item != self.port_source[0] and vtype == source_vtype and direction != source_direction and not signal:
+                                pin_data["marked"] = True
+                            else:
+                                pin_data["marked"] = False
+                        item.update()
+
+    def port_disconnect(self, source, target):
+        if not self.nodesetup["editable"]:
+            return
+        source_pin_data = source[0].pins[source[1]]
+        source_pininfo = source_pin_data["pininfo"]
+        source_name = source_pininfo["name"]
+        target_pin_data = target[0].pins[target[1]]
+        target_pininfo = target_pin_data["pininfo"]
+        target_name = target_pininfo["name"]
+        target_direction = target_pininfo["direction"]
+        if target_direction == "IN":
+            hal.disconnect(target_name)
+        else:
+            hal.disconnect(source_name)
+        self.reload()
+        # self.fit_view()
+
+    def port_connect(self, target, source=None):
+        if not self.nodesetup["editable"]:
+            return
+        if source:
+            self.port_source = source
+        if self.port_source and target:
+            source_pin_data = self.port_source[0].pins[self.port_source[1]]
+            source_pininfo = source_pin_data["pininfo"]
+            source_name = source_pininfo["name"]
+            source_signal = source_pininfo["signal"]
+            source_direction = source_pininfo["direction"]
+            source_vtype = source_pininfo["vtype"]
+            target_pin_data = target[0].pins[target[1]]
+            target_pininfo = target_pin_data["pininfo"]
+            target_name = target_pininfo["name"]
+            target_signal = target_pininfo["signal"]
+            target_direction = target_pininfo["direction"]
+            target_vtype = target_pininfo["vtype"]
+
+            if source_vtype != target_vtype:
+                print(f"ERROR: can not connect {source_vtype} to {target_vtype}")
+            if source_direction == target_direction:
+                print(f"ERROR: can not connect {source_direction} to {target_direction}")
+
+            if source_direction == "OUT":
+                if source_signal == target_signal:
+                    print("  disconnect", target_name)
+                    hal.disconnect(target_name)
+                elif source_signal:
+                    print(f"  source_signal({source_signal}) -> {target_name}")
+                    hal.connect(target_name, source_signal)
+                else:
+                    print(f"  {source_name} -> {target_name}")
+                self.reload()
+                # self.fit_view()
+
+        self.cmd.setText("")
+        self.port_source = None
+
     def toggle(self, name, value):
         self.nodesetup[name] = bool(value)
         self.reload()
         self.fit_view()
+
+    def halcmd(self):
+        cmd = self.cmd.text()
+        print("halcmd:", cmd)
+        if cmd:
+            result = subprocess.run(["halcmd", cmd], stdout=subprocess.PIPE, check=False)
+            print(result.stdout.decode())
 
     def search(self, search):
         self.nodesetup["search"] = search
@@ -981,6 +1111,7 @@ class MainWindow(QMainWindow):
                             "node": title.text,
                             "pin": pin_name,
                             "value": None,
+                            "marked": False,
                             "pininfo": self.pininfo.get(f"{title.text}.{pin_name}", {}),
                         }
                         pins[pin_name] = pdict
