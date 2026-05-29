@@ -40,11 +40,14 @@ if qtversion == "5":
     from PyQt5.QtWidgets import (
         QApplication,
         QCheckBox,
+        QDialog,
+        QDialogButtonBox,
         QGraphicsItem,
         QGraphicsPathItem,
         QGraphicsScene,
         QGraphicsView,
         QHBoxLayout,
+        QLabel,
         QLineEdit,
         QMainWindow,
         QPushButton,
@@ -67,11 +70,15 @@ else:
     from PyQt6.QtWidgets import (
         QApplication,
         QCheckBox,
+        QDialog,
+        QDialogButtonBox,
         QGraphicsItem,
         QGraphicsPathItem,
         QGraphicsScene,
         QGraphicsView,
         QHBoxLayout,
+        QLabel,
+        QLineEdit,
         QMainWindow,
         QPushButton,
         QScrollArea,
@@ -151,6 +158,7 @@ class CompNode(QGraphicsItem):
     text_font = "Times"
     title_color = QColor(255, 255, 255)
     info_color = QColor(200, 200, 200)
+    action_color = QColor(225, 225, 225)
     port_size = 10
     port_border = 2
     port_top = 40
@@ -278,10 +286,14 @@ class CompNode(QGraphicsItem):
             signal = pininfo["signal"]
             if signal is None:
                 painter.setPen(QPen(self.info_color, 1))
+                title = f"{pin_title}={value}"
+                if not signal and direction == "IN":
+                    title = f">{pin_title}={value}<"
+                    painter.setPen(QPen(self.action_color, 1))
                 painter.drawText(
                     QRectF(0, py, self.width, 16),
                     Qt.AlignmentFlag.AlignCenter,
-                    f"{pin_title}={value}",
+                    title,
                 )
             else:
                 if direction == "IN":
@@ -325,7 +337,43 @@ class CompNode(QGraphicsItem):
         if event.button() == Qt.MouseButton.LeftButton:
             port = self.port_selected(event.pos())
             if port:
-                self.parent.toggle_pin_graph(f"{self.title}.{port}")
+                signal = None
+                if port in self.pins:
+                    pin_data = self.pins[port]
+                    pininfo = pin_data["pininfo"]
+                    signal = pininfo["signal"]
+                    direction = pininfo["direction"]
+                    vtype = pininfo["vtype"]
+                    pinname = f"{self.title}.{port}"
+                    if not signal and direction == "IN":
+                        # change value
+                        value = hal.get_value(pinname)
+                        if vtype == "bit":
+                            value = str(int(not value))
+                            hal.set_p(pinname, value)
+                            print(f"setp {pinname} {value}")
+                        else:
+                            dialog = QDialog()
+                            dialog.setWindowTitle(f"setp {pinname}")
+                            dialog.setMinimumWidth(500)
+                            dialog.layout = QVBoxLayout()
+                            dialog.setLayout(dialog.layout)
+                            dialog_buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel | QDialogButtonBox.StandardButton.Ok)
+                            dialog_buttonBox.accepted.connect(dialog.accept)
+                            dialog_buttonBox.rejected.connect(dialog.reject)
+                            edit = QLineEdit()
+                            edit.setText(str(value))
+                            vbox = QVBoxLayout()
+                            vbox.addWidget(QLabel(pinname), stretch=1)
+                            vbox.addWidget(edit, stretch=2)
+                            dialog.layout.addLayout(vbox)
+                            dialog.layout.addWidget(dialog_buttonBox)
+                            if dialog.exec():
+                                value = edit.text()
+                                hal.set_p(pinname, value)
+                                print(f"setp {pinname} {value}")
+                        return
+                self.parent.toggle_pin_graph(pinname)
             else:
                 self.parent.toggle_group_graph(f"{self.title.split('.')[0]}.")
 
