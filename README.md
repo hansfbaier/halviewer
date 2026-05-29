@@ -4,6 +4,20 @@ graphical halviewer for linuxcnc
 
 reads the hal from running linuxcnc session and shows the signals in realtime
 
+## GUI
+
+double-click on title to group/ungroup nodes
+
+double-click on pins to:
+
+* change the value (setp) / maked with ">...<"
+* add a linechart to see the value-changes
+
+you can move the nodes to customize the layout (use STRG to select multiple nodes)
+
+Mouse-Wheel to Zoom In/Out
+
+
 ![screenshot](./halviewer.png)
 
 ## quickstart
