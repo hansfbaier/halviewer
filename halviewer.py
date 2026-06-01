@@ -92,9 +92,10 @@ class NodeEdge(QGraphicsPathItem):
     width = 3
     width_selected = 6
 
-    def __init__(self, parent, source_node, source_port, des_node, des_port):
+    def __init__(self, parent, signal, source_node, source_port, des_node, des_port):
         super().__init__(None)
         self.parent = parent
+        self.signal = signal
         self._source_node = source_node
         self._source_port = source_port
         self._target_node = des_node
@@ -137,6 +138,7 @@ class NodeEdge(QGraphicsPathItem):
 
     def hoverEnterEvent(self, event):
         self.hover = True
+        self.parent.info.setText(self.signal)
         self.update()
 
     def hoverLeaveEvent(self, event):
@@ -331,6 +333,7 @@ class CompNode(QGraphicsItem):
 
     def hoverEnterEvent(self, event):
         self.hover = True
+        self.parent.info.setText(f"Group: {self.title}")
         self.update()
 
     def hoverLeaveEvent(self, event):
@@ -715,6 +718,9 @@ class MainWindow(QMainWindow):
         hboxCmd.addWidget(self.cmd, stretch=1)
         vboxMain.addLayout(hboxCmd)
 
+        self.info = QLabel("--")
+        vboxMain.addWidget(self.info, stretch=0)
+
         self.main = QWidget()
         self.setCentralWidget(self.main)
         self.main.setLayout(vboxMain)
@@ -1011,6 +1017,7 @@ class MainWindow(QMainWindow):
                     id=eid,
                     penwidth="2",
                     color=colors["edge"],
+                    label=signal_name,
                 )
 
         """
@@ -1130,6 +1137,7 @@ class MainWindow(QMainWindow):
         edges = self.root.findall(".//*[@class='edge']")
         for edge in edges:
             title = edge.find(".//{http://www.w3.org/2000/svg}title")
+            signal = edge.find(".//{http://www.w3.org/2000/svg}text")
             if title is not None:
                 begin, end = title.text.split("->")
                 if ":" not in begin:
@@ -1138,8 +1146,10 @@ class MainWindow(QMainWindow):
                 end_node, end_pin = end.split(":")
                 if end_node not in self.nodesdict or begin_node not in self.nodesdict:
                     continue
+
                 edgenode = NodeEdge(
                     self,
+                    f"Signal: {signal.text}",
                     self.nodesdict[begin_node],
                     begin_pin,
                     self.nodesdict[end_node],
