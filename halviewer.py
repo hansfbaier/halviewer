@@ -344,7 +344,14 @@ class CompNode(QGraphicsItem):
         self.update()
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
+        if event.button() == Qt.MouseButton.RightButton:
+            port = self.port_selected(event.pos())
+            if port:
+                self.parent.searchtext.setText(f"{self.title}.{port}")
+            else:
+                self.parent.searchtext.setText(self.title)
+            self.parent.search()
+        elif event.button() == Qt.MouseButton.LeftButton:
             port = self.port_selected(event.pos())
             if port:
                 self.parent.port_select((self, port))
@@ -629,7 +636,8 @@ class MainWindow(QMainWindow):
             for line in result.stdout.decode().split("\n"):
                 if line.startswith("INI_FILE_NAME:"):
                     args.setup = f"{os.path.dirname(line.split()[-1])}/halviewer.json"
-        print(f"INFO: savefile is: {args.setup}")
+        if args.setup:
+            print(f"INFO: savefile is: {args.setup}")
         if args.setup and os.path.isfile(args.setup):
             self.nodesetup = json.loads(open(args.setup, "r").read())
         if "linecharts" not in self.nodesetup:
@@ -965,7 +973,7 @@ class MainWindow(QMainWindow):
                         direction = "I/O"
                         arrow = "==>"
 
-                    if sfilters and name not in sfilters and signal not in sfilters:
+                    if (self.nodesetup["search"] or sfilters) and name not in sfilters and signal not in sfilters:
                         continue
 
                     self.pininfo[name] = {
