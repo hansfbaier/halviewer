@@ -977,7 +977,7 @@ class MainWindow(QMainWindow):
                     if self.nodesetup["search"]:
                         match = False
                         for part in self.nodesetup["search"].split(","):
-                            if part.strip() and part in name:
+                            if part.strip() and part.strip() in name:
                                 match = True
                         if not match:
                             continue
