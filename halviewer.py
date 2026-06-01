@@ -948,6 +948,7 @@ class MainWindow(QMainWindow):
                             if part.strip() and (part.strip() in name or part.strip() in signal):
                                 sfilters.append(name)
                                 sfilters.append(signal)
+                                sfilters.append(".".join(name.split(".")[0:-1]))
 
                     elif self.nodesetup["unconnected"]:
                         owner, vtype, direction, value, name = line.split()
@@ -973,7 +974,7 @@ class MainWindow(QMainWindow):
                         direction = "I/O"
                         arrow = "==>"
 
-                    if (self.nodesetup["search"] or sfilters) and name not in sfilters and signal not in sfilters:
+                    if (self.nodesetup["search"] or sfilters) and not name.startswith(tuple(sfilters)) and signal not in sfilters:
                         continue
 
                     self.pininfo[name] = {
@@ -1003,7 +1004,7 @@ class MainWindow(QMainWindow):
                             self.signals[signal]["source"] = name
                 elif self.nodesetup["unconnected"]:
                     owner, vtype, direction, value, name = line.split()
-                    if sfilters and name not in sfilters:
+                    if (self.nodesetup["search"] or sfilters) and not name.startswith(tuple(sfilters)):
                         continue
 
                     self.pininfo[name] = {
