@@ -17,6 +17,8 @@ you can move the nodes to customize the layout (use STRG to select multiple node
 
 Mouse-Wheel to Zoom In/Out
 
+right-click on pins/titles to filter
+
 
 ![screenshot](./halviewer.png)
 
