@@ -23,6 +23,7 @@ parser.add_argument("--qt5", "-5", help="using pyqt5", default=False, action="st
 parser.add_argument("--qt6", "-6", help="using pyqt6", default=False, action="store_true")
 parser.add_argument("--svg", "-S", help="save to svg and exit", type=str, default="")
 parser.add_argument("--file", "-f", help="read halcmd show from dump file", type=str, default="")
+parser.add_argument("--direct", "-d", help="direct search / no enter needed", default=False, action="store_true")
 args = parser.parse_args()
 qtversion = "5"
 if args.qt6:
@@ -656,17 +657,11 @@ class MainWindow(QMainWindow):
         self.view = NodeViewer(self)
         self.charts = LineCharts(self)
 
-        svg_data = self.export()
-
         if args.svg:
             print(f"saving svg to {args.svg}")
+            svg_data = self.export()
             open(args.svg, "w").write(svg_data.decode())
             sys.exit(0)
-
-        self.root = ET.fromstring(svg_data)
-        if self.root is None:
-            print("ERROR parsing ini file")
-            exit(0)
 
         self.h = hal.component(f"halview-{uuid.uuid4()}")
         self.h.ready()
@@ -680,10 +675,13 @@ class MainWindow(QMainWindow):
             checkbox.stateChanged.connect(partial(self.toggle, tval))
             hboxBoxes.addWidget(checkbox, stretch=0)
 
-        search = QLineEdit()
-        search.setText(self.nodesetup["search"])
-        search.textChanged.connect(self.search)
-        hboxBoxes.addWidget(search, stretch=0)
+        self.searchtext = QLineEdit()
+        self.searchtext.setText(self.nodesetup["search"])
+        if args.direct:
+            self.searchtext.textChanged.connect(self.search)
+        else:
+            self.searchtext.returnPressed.connect(self.search)
+        hboxBoxes.addWidget(self.searchtext, stretch=0)
 
         button_reset_grouping = QPushButton("Reset grouping")
         button_reset_grouping.clicked.connect(self.reset_grouping)
@@ -732,6 +730,12 @@ class MainWindow(QMainWindow):
         self.main = QWidget()
         self.setCentralWidget(self.main)
         self.main.setLayout(vboxMain)
+
+        svg_data = self.export()
+        self.root = ET.fromstring(svg_data)
+        if self.root is None:
+            print("ERROR parsing ini file")
+            exit(0)
 
         self.readGraph()
         self.check_splitter()
@@ -847,8 +851,8 @@ class MainWindow(QMainWindow):
             result = subprocess.run(["halcmd", cmd], stdout=subprocess.PIPE, check=False)
             print(result.stdout.decode())
 
-    def search(self, search):
-        self.nodesetup["search"] = search
+    def search(self, text=None):
+        self.nodesetup["search"] = self.searchtext.text()
         self.reload()
         self.fit_view()
 
@@ -1083,7 +1087,12 @@ class MainWindow(QMainWindow):
                 style="",
             )
 
-        return self.gAll.pipe()
+        print("INFO: rendering graph using graphviz...", end="", flush=True)
+        self.info.setText("INFO: rendering graph using graphviz...")
+        ret = self.gAll.pipe()
+        print("..done")
+        self.info.setText("INFO: rendering graph using graphviz.....done")
+        return ret
 
     def readGraph(self):
         # clean scene
