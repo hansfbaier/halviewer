@@ -923,6 +923,37 @@ class MainWindow(QMainWindow):
         else:
             result = subprocess.run(["halcmd", "show"], stdout=subprocess.PIPE, check=False).stdout.decode()
 
+
+        sfilters = []
+        if self.nodesetup["search"]:
+            section = ""
+            for line in result.split("\n"):
+                if line == "Parameters:":
+                    section = "params"
+                elif line == "Component Pins:":
+                    section = "pins"
+                elif not line:
+                    section = ""
+                elif section == "pins" and line.split()[0].isnumeric():
+                    if "=" in line:
+                        owner, vtype, direction, value, name, arrow, signal = line.split()
+
+                        match = False
+                        for part in self.nodesetup["search"].split(","):
+                            if part.strip() and (part.strip() in name or part.strip() in signal):
+                                match = True
+                                sfilters.append(name)
+                                sfilters.append(signal)
+
+                    elif self.nodesetup["unconnected"]:
+                        owner, vtype, direction, value, name = line.split()
+                        if self.nodesetup["search"]:
+                            match = False
+                            for part in self.nodesetup["search"].split(","):
+                                if part.strip() and part.strip() in name:
+                                    match = True
+                                    sfilters.append(name)
+
         section = ""
         for line in result.split("\n"):
             if line == "Parameters:":
@@ -940,12 +971,8 @@ class MainWindow(QMainWindow):
                         direction = "I/O"
                         arrow = "==>"
 
-                    if self.nodesetup["search"]:
-                        match = False
-                        for part in self.nodesetup["search"].split(","):
-                            if part.strip() and (part.strip() in name or part.strip() in signal):
-                                match = True
-                        if not match:
+                    if sfilters:
+                        if name not in sfilters and signal not in sfilters:
                             continue
 
                     self.pininfo[name] = {
@@ -975,12 +1002,8 @@ class MainWindow(QMainWindow):
                             self.signals[signal]["source"] = name
                 elif self.nodesetup["unconnected"]:
                     owner, vtype, direction, value, name = line.split()
-                    if self.nodesetup["search"]:
-                        match = False
-                        for part in self.nodesetup["search"].split(","):
-                            if part.strip() and part.strip() in name:
-                                match = True
-                        if not match:
+                    if sfilters:
+                        if name not in sfilters:
                             continue
 
                     self.pininfo[name] = {
