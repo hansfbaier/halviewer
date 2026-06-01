@@ -21,6 +21,8 @@ parser.add_argument("--buffer", "-b", help="linechart buffer size", type=int, de
 parser.add_argument("--setup", "-s", help="setup file", type=str, default="")
 parser.add_argument("--qt5", "-5", help="using pyqt5", default=False, action="store_true")
 parser.add_argument("--qt6", "-6", help="using pyqt6", default=False, action="store_true")
+parser.add_argument("--svg", "-S", help="save to svg and exit", type=str, default="")
+parser.add_argument("--file", "-f", help="read halcmd show from dump file", type=str, default="")
 args = parser.parse_args()
 qtversion = "5"
 if args.qt6:
@@ -435,8 +437,8 @@ class NodeViewer(QGraphicsView):
     def wheelEvent(self, event):
         zoom = self.getZoom()
         angle = event.angleDelta().y()
-        zoomFactor = max(min(1 + (angle / 1000), 1.2), 0.8)
-        if zoom < 0.1 and zoomFactor < 1.0:
+        zoomFactor = max(min(1 + (angle / 1000), 1.2), 0.2)
+        if zoom < 0.06 and zoomFactor < 0.5:
             return
         if self.getZoom() > 5.0 and zoomFactor > 1.0:
             return
@@ -635,9 +637,9 @@ class MainWindow(QMainWindow):
         if "grouping" not in self.nodesetup:
             self.nodesetup["grouping"] = self.default_grouping[0:]
         if "unconnected" not in self.nodesetup:
-            self.nodesetup["unconnected"] = True
+            self.nodesetup["unconnected"] = False
         if "namesort" not in self.nodesetup:
-            self.nodesetup["namesort"] = True
+            self.nodesetup["namesort"] = False
         if "dirsort" not in self.nodesetup:
             self.nodesetup["dirsort"] = False
         if "filter" not in self.nodesetup:
@@ -655,6 +657,12 @@ class MainWindow(QMainWindow):
         self.charts = LineCharts(self)
 
         svg_data = self.export()
+
+        if args.svg:
+            print(f"saving svg to {args.svg}")
+            open(args.svg, "w").write(svg_data.decode())
+            sys.exit(0)
+
         self.root = ET.fromstring(svg_data)
         if self.root is None:
             print("ERROR parsing ini file")
@@ -905,9 +913,13 @@ class MainWindow(QMainWindow):
         self.components = {}
         self.setps = []
 
-        result = subprocess.run(["halcmd", "show"], stdout=subprocess.PIPE, check=False)
+        if args.file:
+            result = open(args.file, "r").read()
+        else:
+            result = subprocess.run(["halcmd", "show"], stdout=subprocess.PIPE, check=False).stdout.decode()
+
         section = ""
-        for line in result.stdout.decode().split("\n"):
+        for line in result.split("\n"):
             if line == "Parameters:":
                 section = "params"
             elif line == "Component Pins:":
@@ -917,6 +929,12 @@ class MainWindow(QMainWindow):
             elif section == "pins" and line.split()[0].isnumeric():
                 if "=" in line:
                     owner, vtype, direction, value, name, arrow, signal = line.split()
+
+                    # handle ini pins as output
+                    if name.startswith("ini."):
+                        direction = "OUT"
+                        arrow = "==>"
+
                     if self.nodesetup["search"]:
                         match = False
                         for part in self.nodesetup["search"].split(","):
@@ -1075,6 +1093,10 @@ class MainWindow(QMainWindow):
         self.pinsdict = {}
         self.nodesdict = {}
 
+        min_x = 0
+        min_y = 0
+        max_x = 0
+        max_y = 0
         nodes = self.root.findall(".//*[@class='node']")
         for node in nodes:
             title = node.find(".//{http://www.w3.org/2000/svg}title")
@@ -1132,6 +1154,15 @@ class MainWindow(QMainWindow):
                     x1, y1 = self.nodesetup["positions"][title.text]
                 self.nodesdict[title.text] = CompNode(self, x1, y1, w, h, title.text, pins)
                 self.scene.addItem(self.nodesdict[title.text])
+
+                min_x = min(min_x, x1)
+                min_y = min(min_y, y1)
+                max_x = max(max_x, x1 + w)
+                max_y = max(max_y, y1 + h)
+
+        width = max_x - min_x
+        height = max_y - min_y
+        self.scene.setSceneRect(min_x - 500, min_y - 500, width + 1000, height + 1000)
 
         self.edges = {}
         edges = self.root.findall(".//*[@class='edge']")
@@ -1230,10 +1261,10 @@ class MainWindow(QMainWindow):
         self.run = 1 - self.run
 
     def fit_view(self):
-        min_x = 99999
-        min_y = 99999
-        max_x = -99999
-        max_y = -99999
+        min_x = 9999999
+        min_y = 9999999
+        max_x = -9999999
+        max_y = -9999999
         for item in self.scene.items():
             if isinstance(item, NodeEdge):
                 continue
@@ -1244,7 +1275,7 @@ class MainWindow(QMainWindow):
             max_x = max(max_x, px + item.width)
             max_y = max(max_y, py + item.height)
         # calc scale and offsets
-        if min_x == 99999:
+        if min_x == 9999999:
             min_x = 0
             max_x = 800
             min_y = 0
