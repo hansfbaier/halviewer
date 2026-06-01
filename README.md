@@ -38,5 +38,5 @@ if you want to use pyqt6 support:
 python3 halviewer.py -6
 ```
 
-
+[![HalViewer](https://img.youtube.com/vi/isgavyVCYJc/0.jpg)](https://www.youtube.com/watch?v=isgavyVCYJc&feature=youtu.be "HalViewer")
 [![HalViewer](https://img.youtube.com/vi/Ma7J_gvicco/0.jpg)](https://www.youtube.com/watch?v=Ma7J_gvicco&feature=youtu.be "HalViewer")
