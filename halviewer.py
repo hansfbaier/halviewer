@@ -701,7 +701,7 @@ class MainWindow(QMainWindow):
 
         vboxMain = QVBoxLayout()
         hboxButtons.addStretch()
-        vboxMain.addLayout(hboxButtons)
+        vboxMain.addLayout(hboxButtons, stretch=0)
 
         linecharts = QScrollArea()
         linecharts.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
@@ -713,16 +713,16 @@ class MainWindow(QMainWindow):
         self.splitter.addWidget(self.view)
         self.splitter.addWidget(linecharts)
         self.splitter.setSizes([self.geometry().width() - self.charts.width, 0])
-        vboxMain.addWidget(self.splitter)
+        vboxMain.addWidget(self.splitter, stretch=1)
         hboxBoxes.addStretch()
-        vboxMain.addLayout(hboxBoxes)
+        vboxMain.addLayout(hboxBoxes, stretch=0)
 
         hboxCmd = QHBoxLayout()
         self.cmd = QLineEdit()
         self.cmd.returnPressed.connect(self.halcmd)
         hboxCmd.addWidget(QLabel("Hall-Command:"), stretch=0)
         hboxCmd.addWidget(self.cmd, stretch=1)
-        vboxMain.addLayout(hboxCmd)
+        vboxMain.addLayout(hboxCmd, stretch=0)
 
         self.info = QLabel("--")
         vboxMain.addWidget(self.info, stretch=0)
@@ -942,7 +942,7 @@ class MainWindow(QMainWindow):
                     if self.nodesetup["search"]:
                         match = False
                         for part in self.nodesetup["search"].split(","):
-                            if part.strip() and (part in name or part in signal):
+                            if part.strip() and (part.strip() in name or part.strip() in signal):
                                 match = True
                         if not match:
                             continue
