@@ -558,7 +558,7 @@ class LineCharts(QWidget):
 
 class MainWindow(QMainWindow):
     search_str = ""
-    default_grouping = ["halui.", "pyvcp.", "qtpyvcp.", "gladevcp.", "qtdragon.", "flexhal.", "rio-gui."]
+    default_grouping = ["halui.", "pyvcp.", "qtpyvcp.", "gladevcp.", "qtdragon.", "flexhal.", "rio-gui.", "cmsg."]
     grouping = []
     cfilter = (
         "halui.",
@@ -629,6 +629,7 @@ class MainWindow(QMainWindow):
             for line in result.stdout.decode().split("\n"):
                 if line.startswith("INI_FILE_NAME:"):
                     args.setup = f"{os.path.dirname(line.split()[-1])}/halviewer.json"
+        print(f"INFO: savefile is: {args.setup}")
         if args.setup and os.path.isfile(args.setup):
             self.nodesetup = json.loads(open(args.setup, "r").read())
         if "linecharts" not in self.nodesetup:
@@ -936,7 +937,7 @@ class MainWindow(QMainWindow):
 
                     # handle ini pins as output
                     if name.startswith("ini."):
-                        direction = "OUT"
+                        direction = "I/O"
                         arrow = "==>"
 
                     if self.nodesetup["search"]:
