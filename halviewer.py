@@ -923,7 +923,6 @@ class MainWindow(QMainWindow):
         else:
             result = subprocess.run(["halcmd", "show"], stdout=subprocess.PIPE, check=False).stdout.decode()
 
-
         sfilters = []
         if self.nodesetup["search"]:
             section = ""
@@ -937,21 +936,16 @@ class MainWindow(QMainWindow):
                 elif section == "pins" and line.split()[0].isnumeric():
                     if "=" in line:
                         owner, vtype, direction, value, name, arrow, signal = line.split()
-
-                        match = False
                         for part in self.nodesetup["search"].split(","):
                             if part.strip() and (part.strip() in name or part.strip() in signal):
-                                match = True
                                 sfilters.append(name)
                                 sfilters.append(signal)
 
                     elif self.nodesetup["unconnected"]:
                         owner, vtype, direction, value, name = line.split()
                         if self.nodesetup["search"]:
-                            match = False
                             for part in self.nodesetup["search"].split(","):
                                 if part.strip() and part.strip() in name:
-                                    match = True
                                     sfilters.append(name)
 
         section = ""
@@ -971,9 +965,8 @@ class MainWindow(QMainWindow):
                         direction = "I/O"
                         arrow = "==>"
 
-                    if sfilters:
-                        if name not in sfilters and signal not in sfilters:
-                            continue
+                    if sfilters and name not in sfilters and signal not in sfilters:
+                        continue
 
                     self.pininfo[name] = {
                         "owner": owner,
@@ -1002,9 +995,8 @@ class MainWindow(QMainWindow):
                             self.signals[signal]["source"] = name
                 elif self.nodesetup["unconnected"]:
                     owner, vtype, direction, value, name = line.split()
-                    if sfilters:
-                        if name not in sfilters:
-                            continue
+                    if sfilters and name not in sfilters:
+                        continue
 
                     self.pininfo[name] = {
                         "owner": owner,
