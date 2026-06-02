@@ -917,8 +917,10 @@ class MainWindow(QMainWindow):
             "setp_text": "black",
         }
 
-        self.gAll = graphviz.Digraph("G", format="svg", engine="dot")
-        self.gAll.attr(ranksep="2.5")
+        engine = "dot"  # 'circo', 'dot', 'fdp', 'neato', 'osage', 'patchwork', 'sfdp', 'twopi'
+        ranksep = "1.5"
+        self.gAll = graphviz.Digraph("G", format="svg", engine=engine)
+        self.gAll.attr(ranksep=ranksep)
         self.gAll.attr(rankdir="LR")
 
         self.pininfo = {}
@@ -1112,6 +1114,7 @@ class MainWindow(QMainWindow):
                 style="",
             )
 
+        #self.gAll.render(filename='/tmp/g1.dot')
         print("INFO: rendering graph using graphviz...", end="", flush=True)
         self.info.setText("INFO: rendering graph using graphviz...")
         ret = self.gAll.pipe()
