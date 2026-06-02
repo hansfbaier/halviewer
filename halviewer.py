@@ -1114,7 +1114,7 @@ class MainWindow(QMainWindow):
                 style="",
             )
 
-        #self.gAll.render(filename='/tmp/g1.dot')
+        # self.gAll.render(filename='/tmp/g1.dot')
         print("INFO: rendering graph using graphviz...", end="", flush=True)
         self.info.setText("INFO: rendering graph using graphviz...")
         ret = self.gAll.pipe()
