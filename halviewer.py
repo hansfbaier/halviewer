@@ -804,6 +804,11 @@ class MainWindow(QMainWindow):
         self._completer_activated = True
         if not text:
             text = self.searchtext.text()
+        self.nodesetup["search"] = ""
+        self.searchtext.blockSignals(True)
+        self.searchtext.clear()
+        self.searchtext.blockSignals(False)
+        self.reload()
         self.zoom_to_item(text)
         QTimer.singleShot(0, self._reset_completer_flag)
 
