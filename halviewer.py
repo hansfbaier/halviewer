@@ -30,7 +30,7 @@ if args.qt6:
     qtversion = "6"
 
 if qtversion == "5":
-    from PyQt5.QtCore import QPoint, QPointF, QRectF, QTimer, Qt
+    from PyQt5.QtCore import QPoint, QPointF, QRectF, QStringListModel, QTimer, Qt
     from PyQt5.QtGui import (
         QBrush,
         QColor,
@@ -44,6 +44,7 @@ if qtversion == "5":
     from PyQt5.QtWidgets import (
         QApplication,
         QCheckBox,
+        QCompleter,
         QDialog,
         QDialogButtonBox,
         QGraphicsItem,
@@ -62,10 +63,11 @@ if qtversion == "5":
         QWidget,
     )
 else:
-    from PyQt6.QtCore import QPoint, QPointF, QRectF, QTimer, Qt
+    from PyQt6.QtCore import QPoint, QPointF, QRectF, QStringListModel, QTimer, Qt
     from PyQt6.QtGui import (
         QBrush,
         QColor,
+        QCompleter,
         QFont,
         QKeySequence,
         QMouseEvent,
@@ -696,6 +698,16 @@ class MainWindow(QMainWindow):
             self.searchtext.returnPressed.connect(self.search)
         hboxBoxes.addWidget(self.searchtext, stretch=0)
 
+        self._completer_activated = False
+        self.completer = QCompleter(self)
+        self.completer_model = QStringListModel()
+        self.completer.setModel(self.completer_model)
+        self.completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        self.completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        self.completer.setMaxVisibleItems(20)
+        self.searchtext.setCompleter(self.completer)
+        self.completer.activated.connect(self.on_search_activated)
+
         button_reset_grouping = QPushButton("Reset grouping")
         button_reset_grouping.clicked.connect(self.reset_grouping)
         hboxButtons.addWidget(button_reset_grouping, stretch=0)
@@ -787,6 +799,56 @@ class MainWindow(QMainWindow):
     def focus_search(self):
         self.searchtext.setFocus()
         self.searchtext.selectAll()
+
+    def on_search_activated(self, text=None):
+        self._completer_activated = True
+        if not text:
+            text = self.searchtext.text()
+        self.zoom_to_item(text)
+        QTimer.singleShot(0, self._reset_completer_flag)
+
+    def _reset_completer_flag(self):
+        self._completer_activated = False
+
+    def zoom_to_item(self, text):
+        name = text.strip()
+        if not name:
+            return
+        if name in self.nodesdict:
+            instance = name
+        elif name in self.pinsdict:
+            instance = self.pinsdict[name]["node"]
+        else:
+            return
+        self.zoom_to_instance(instance)
+
+    def zoom_to_instance(self, name):
+        node = self.nodesdict.get(name)
+        if node is None:
+            return
+        node.boundingRect()
+        px = node.pos().x()
+        py = node.pos().y()
+        w = node.width
+        h = node.height
+        slider_size = 20
+        vw = self.view.width() - slider_size
+        vh = self.view.height() - slider_size
+        border = 80
+        scale = min((vw - border) / w, (vh - border) / h)
+        scale = min(scale, 4.0)
+        if scale <= 0:
+            return
+        pos_x = int(px * scale)
+        pos_y = int(py * scale)
+        diff_x = vw - w * scale
+        diff_y = vh - h * scale
+        pos_x -= diff_x / 2
+        pos_y -= diff_y / 2
+        self.view.setZoom(scale)
+        self.view.horizontalScrollBar().setSliderPosition(int(pos_x))
+        self.view.verticalScrollBar().setSliderPosition(int(pos_y))
+        self.update()
 
     def port_select(self, port):
         if not self.nodesetup["editable"]:
@@ -894,6 +956,8 @@ class MainWindow(QMainWindow):
             print(result.stdout.decode())
 
     def search(self, text=None):
+        if self._completer_activated:
+            return
         self.nodesetup["search"] = self.searchtext.text()
         self.reload()
         self.fit_view()
@@ -1262,6 +1326,10 @@ class MainWindow(QMainWindow):
                     self.edges[pin] = []
                 self.edges[pin].append(edgenode)
         self.writeSetup()
+        if hasattr(self, "completer_model"):
+            self.completer_model.setStringList(
+                sorted(set(list(self.nodesdict.keys()) + list(self.pinsdict.keys())))
+            )
 
     def writeSetup(self):
         if args.setup:
