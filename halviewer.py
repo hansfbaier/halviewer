@@ -35,6 +35,7 @@ if qtversion == "5":
         QBrush,
         QColor,
         QFont,
+        QKeySequence,
         QMouseEvent,
         QPainter,
         QPainterPath,
@@ -55,6 +56,7 @@ if qtversion == "5":
         QMainWindow,
         QPushButton,
         QScrollArea,
+        QShortcut,
         QSplitter,
         QVBoxLayout,
         QWidget,
@@ -65,10 +67,12 @@ else:
         QBrush,
         QColor,
         QFont,
+        QKeySequence,
         QMouseEvent,
         QPainter,
         QPainterPath,
         QPen,
+        QShortcut,
     )
     from PyQt6.QtWidgets import (
         QApplication,
@@ -754,6 +758,35 @@ class MainWindow(QMainWindow):
         self.timer = QTimer()
         self.timer.timeout.connect(self.runTimer)
         self.timer.start(args.interval)
+
+        # Keyboard shortcuts
+        zoom_in_shortcut = QShortcut(QKeySequence(Qt.Modifier.CTRL | Qt.Key.Key_Equal), self)
+        zoom_in_shortcut.activated.connect(self.zoom_in)
+
+        zoom_out_shortcut = QShortcut(QKeySequence(Qt.Modifier.CTRL | Qt.Key.Key_Minus), self)
+        zoom_out_shortcut.activated.connect(self.zoom_out)
+
+        fit_shortcut = QShortcut(QKeySequence(Qt.Modifier.CTRL | Qt.Key.Key_0), self)
+        fit_shortcut.activated.connect(self.fit_view)
+
+        search_shortcut = QShortcut(QKeySequence(Qt.Modifier.CTRL | Qt.Key.Key_F), self)
+        search_shortcut.activated.connect(self.focus_search)
+
+    def zoom_in(self):
+        old_anchor = self.view.transformationAnchor()
+        self.view.setTransformationAnchor(self.view.ViewportAnchor.AnchorViewCenter)
+        self.view.scale(1.15, 1.15)
+        self.view.setTransformationAnchor(old_anchor)
+
+    def zoom_out(self):
+        old_anchor = self.view.transformationAnchor()
+        self.view.setTransformationAnchor(self.view.ViewportAnchor.AnchorViewCenter)
+        self.view.scale(1 / 1.15, 1 / 1.15)
+        self.view.setTransformationAnchor(old_anchor)
+
+    def focus_search(self):
+        self.searchtext.setFocus()
+        self.searchtext.selectAll()
 
     def port_select(self, port):
         if not self.nodesetup["editable"]:
